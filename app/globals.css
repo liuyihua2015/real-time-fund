@@ -165,8 +165,8 @@ body {
   font-size: 20px;
   font-weight: 700;
 }
-.up { color: var(--success); }
-.down { color: var(--danger); }
+.up { color: var(--danger); }
+.down { color: var(--success); }
 
 .list {
   display: grid;

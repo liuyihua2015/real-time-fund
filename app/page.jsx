@@ -34,9 +34,9 @@ function RefreshIcon(props) {
   return (
     <svg {...props} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
       <path d="M4 12a8 8 0 0 1 12.5-6.9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="M16 5h3v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M20 12a8 8 0 0 1-12.5 6.9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="M8 19H5v-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M16 5h3v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M20 12a8 8 0 0 1-12.5 6.9" stroke="currentColor" strokeWidth="2" />
+      <path d="M8 19H5v-3" stroke="currentColor" strokeWidth="2" />
     </svg>
   );
 }
@@ -62,31 +62,12 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const timerRef = useRef(null);
+  const [manualRefreshing, setManualRefreshing] = useState(false);
+  
+  // 刷新频率状态
   const [refreshMs, setRefreshMs] = useState(30000);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tempSeconds, setTempSeconds] = useState(30);
-  const [manualRefreshing, setManualRefreshing] = useState(false);
-
-  // --- 新增：API 地址与数据源模式 ---
-  const [useJsonp, setUseJsonp] = useState(false);
-  const [apiBase, setApiBase] = useState('/api');
-  const [tempApiBase, setTempApiBase] = useState('/api');
-  const [tempUseJsonp, setTempUseJsonp] = useState(false);
-
-  // 构造绝对路径的工具函数，避免 GitHub Pages basePath 干扰
-  const buildUrl = (path) => {
-    // 如果 apiBase 是绝对地址，直接拼接
-    if (apiBase.startsWith('http://') || apiBase.startsWith('https://')) {
-      const base = apiBase.replace(/\/$/, '');
-      const p = path.startsWith('/') ? path : `/${path}`;
-      return `${base}${p}`;
-    }
-    // 否则拼接当前 origin 确保是绝对地址
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const base = apiBase.startsWith('/') ? apiBase : `/${apiBase}`;
-    const p = path.startsWith('/') ? path : `/${path}`;
-    return `${origin}${base.replace(/\/$/, '')}${p}`;
-  };
 
   useEffect(() => {
     try {
@@ -96,16 +77,10 @@ export default function HomePage() {
         refreshAll(saved.map((f) => f.code));
       }
       const savedMs = parseInt(localStorage.getItem('refreshMs') || '30000', 10);
-      if (Number.isFinite(savedMs) && savedMs > 0) {
+      if (Number.isFinite(savedMs) && savedMs >= 5000) {
         setRefreshMs(savedMs);
         setTempSeconds(Math.round(savedMs / 1000));
       }
-      const savedApi = localStorage.getItem('apiBase') || '/api';
-      setApiBase(savedApi);
-      setTempApiBase(savedApi);
-      const savedJsonp = localStorage.getItem('useJsonp') === 'true';
-      setUseJsonp(savedJsonp);
-      setTempUseJsonp(savedJsonp);
     } catch {}
   }, []);
 
@@ -132,65 +107,138 @@ export default function HomePage() {
       };
       script.onerror = () => {
         document.body.removeChild(script);
-        reject(new Error('脚本加载失败'));
+        reject(new Error('数据加载失败'));
       };
       document.body.appendChild(script);
     });
   };
 
   const fetchFundData = async (c) => {
-    if (useJsonp) {
-      // JSONP 模式：直接请求东方财富
-      return new Promise(async (resolve, reject) => {
-        const gzUrl = `https://fundgz.1234567.com.cn/js/${c}.js?rt=${Date.now()}`;
-        // 东方财富估值接口固定回调 jsonpgz
-        window.jsonpgz = (json) => {
-          const gszzlNum = Number(json.gszzl);
-          const gzData = {
-            code: json.fundcode,
-            name: json.name,
-            dwjz: json.dwjz,
-            gsz: json.gsz,
-            gztime: json.gztime,
-            gszzl: Number.isFinite(gszzlNum) ? gszzlNum : json.gszzl
-          };
-          
-          // 获取重仓 (通过脚本注入并解析全局变量)
-          const holdingsUrl = `https://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code=${c}&topline=10&year=&month=&rt=${Date.now()}`;
-          loadScript(holdingsUrl).then(() => {
-            let holdings = [];
-            const html = window.apidata?.content || '';
-            const rows = html.match(/<tr[\s\S]*?<\/tr>/gi) || [];
-            for (const r of rows) {
-              const cells = (r.match(/<td[\s\S]*?>([\s\S]*?)<\/td>/gi) || []).map(td => td.replace(/<[^>]*>/g, '').trim());
-              const codeIdx = cells.findIndex(txt => /^\d{6}$/.test(txt));
-              const weightIdx = cells.findIndex(txt => /\d+(?:\.\d+)?\s*%/.test(txt));
-              if (codeIdx >= 0 && weightIdx >= 0) {
-                holdings.push({
-                  code: cells[codeIdx],
-                  name: cells[codeIdx + 1] || '',
-                  weight: cells[weightIdx]
-                });
-              }
-            }
-            resolve({ ...gzData, holdings: holdings.slice(0, 10) });
-          }).catch(() => resolve({ ...gzData, holdings: [] }));
+    return new Promise(async (resolve, reject) => {
+      // 腾讯接口识别逻辑优化
+      const getTencentPrefix = (code) => {
+        if (code.startsWith('6') || code.startsWith('9')) return 'sh';
+        if (code.startsWith('0') || code.startsWith('3')) return 'sz';
+        if (code.startsWith('4') || code.startsWith('8')) return 'bj';
+        return 'sz';
+      };
+
+      const gzUrl = `https://fundgz.1234567.com.cn/js/${c}.js?rt=${Date.now()}`;
+      
+      // 使用更安全的方式处理全局回调，避免并发覆盖
+      const currentCallback = `jsonpgz_${c}_${Math.random().toString(36).slice(2, 7)}`;
+      
+      // 动态拦截并处理 jsonpgz 回调
+      const scriptGz = document.createElement('script');
+      // 东方财富接口固定调用 jsonpgz，我们通过修改全局变量临时捕获它
+      scriptGz.src = gzUrl;
+      
+      const originalJsonpgz = window.jsonpgz;
+      window.jsonpgz = (json) => {
+        window.jsonpgz = originalJsonpgz; // 立即恢复
+        const gszzlNum = Number(json.gszzl);
+        const gzData = {
+          code: json.fundcode,
+          name: json.name,
+          dwjz: json.dwjz,
+          gsz: json.gsz,
+          gztime: json.gztime,
+          gszzl: Number.isFinite(gszzlNum) ? gszzlNum : json.gszzl
         };
-        loadScript(gzUrl).catch(reject);
-      });
-    } else {
-      // API 模式：使用绝对路径请求后端
-      const res = await fetch(buildUrl(`/fund?code=${encodeURIComponent(c)}`), { cache: 'no-store' });
-      if (!res.ok) throw new Error('网络错误');
-      return await res.json();
-    }
+        
+        // 获取重仓股票列表
+        const holdingsUrl = `https://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code=${c}&topline=10&year=&month=&rt=${Date.now()}`;
+        loadScript(holdingsUrl).then(async () => {
+          let holdings = [];
+          const html = window.apidata?.content || '';
+          const rows = html.match(/<tr[\s\S]*?<\/tr>/gi) || [];
+          for (const r of rows) {
+            const cells = (r.match(/<td[\s\S]*?>([\s\S]*?)<\/td>/gi) || []).map(td => td.replace(/<[^>]*>/g, '').trim());
+            const codeIdx = cells.findIndex(txt => /^\d{6}$/.test(txt));
+            const weightIdx = cells.findIndex(txt => /\d+(?:\.\d+)?\s*%/.test(txt));
+            if (codeIdx >= 0 && weightIdx >= 0) {
+              holdings.push({
+                code: cells[codeIdx],
+                name: cells[codeIdx + 1] || '',
+                weight: cells[weightIdx],
+                change: null
+              });
+            }
+          }
+          
+          holdings = holdings.slice(0, 10);
+          
+          if (holdings.length) {
+            try {
+              const tencentCodes = holdings.map(h => `s_${getTencentPrefix(h.code)}${h.code}`).join(',');
+              const quoteUrl = `https://qt.gtimg.cn/q=${tencentCodes}`;
+              
+              await new Promise((resQuote) => {
+                const scriptQuote = document.createElement('script');
+                scriptQuote.src = quoteUrl;
+                scriptQuote.onload = () => {
+                  holdings.forEach(h => {
+                    const varName = `v_s_${getTencentPrefix(h.code)}${h.code}`;
+                    const dataStr = window[varName];
+                    if (dataStr) {
+                      const parts = dataStr.split('~');
+                      // parts[5] 是涨跌幅
+                      if (parts.length > 5) {
+                        h.change = parseFloat(parts[5]);
+                      }
+                    }
+                  });
+                  if (document.body.contains(scriptQuote)) document.body.removeChild(scriptQuote);
+                  resQuote();
+                };
+                scriptQuote.onerror = () => {
+                  if (document.body.contains(scriptQuote)) document.body.removeChild(scriptQuote);
+                  resQuote();
+                };
+                document.body.appendChild(scriptQuote);
+              });
+            } catch (e) {
+              console.error('获取股票涨跌幅失败', e);
+            }
+          }
+          
+          resolve({ ...gzData, holdings });
+        }).catch(() => resolve({ ...gzData, holdings: [] }));
+      };
+
+      scriptGz.onerror = () => {
+        window.jsonpgz = originalJsonpgz;
+        if (document.body.contains(scriptGz)) document.body.removeChild(scriptGz);
+        reject(new Error('基金数据加载失败'));
+      };
+
+      document.body.appendChild(scriptGz);
+      // 加载完立即移除脚本
+      setTimeout(() => {
+        if (document.body.contains(scriptGz)) document.body.removeChild(scriptGz);
+      }, 5000);
+    });
   };
 
   const refreshAll = async (codes) => {
     try {
-      const updated = await Promise.all(codes.map(c => fetchFundData(c)));
-      setFunds(updated);
-      localStorage.setItem('funds', JSON.stringify(updated));
+      // 改用串行请求，避免全局回调 jsonpgz 并发冲突
+      const updated = [];
+      for (const c of codes) {
+        try {
+          const data = await fetchFundData(c);
+          updated.push(data);
+        } catch (e) {
+          console.error(`刷新基金 ${c} 失败`, e);
+          // 失败时保留旧数据
+          const old = funds.find(f => f.code === c);
+          if (old) updated.push(old);
+        }
+      }
+      if (updated.length) {
+        setFunds(updated);
+        localStorage.setItem('funds', JSON.stringify(updated));
+      }
     } catch (e) {
       console.error(e);
     }
@@ -245,14 +293,6 @@ export default function HomePage() {
     const ms = Math.max(5, Number(tempSeconds)) * 1000;
     setRefreshMs(ms);
     localStorage.setItem('refreshMs', String(ms));
-    
-    const nextApi = (tempApiBase || '/api').trim();
-    setApiBase(nextApi);
-    localStorage.setItem('apiBase', nextApi);
-    
-    setUseJsonp(tempUseJsonp);
-    localStorage.setItem('useJsonp', String(tempUseJsonp));
-    
     setSettingsOpen(false);
   };
 
@@ -308,23 +348,18 @@ export default function HomePage() {
             <span className="muted">输入基金编号（例如：110022）</span>
           </div>
           <form className="form" onSubmit={addFund}>
-            <label htmlFor="fund-code" className="muted" style={{ position: 'absolute', left: -9999 }}>
-              基金编号
-            </label>
             <input
-              id="fund-code"
               className="input"
               placeholder="基金编号"
               value={code}
               onChange={(e) => setCode(e.target.value)}
               inputMode="numeric"
-              aria-invalid={!!error}
             />
-            <button className="button" type="submit" disabled={loading} aria-busy={loading}>
+            <button className="button" type="submit" disabled={loading}>
               {loading ? '添加中…' : '添加'}
             </button>
           </form>
-          {error && <div className="muted" role="alert" style={{ marginTop: 8, color: 'var(--danger)' }}>{error}</div>}
+          {error && <div className="muted" style={{ marginTop: 8, color: 'var(--danger)' }}>{error}</div>}
         </div>
 
         <div className="col-12">
@@ -334,7 +369,7 @@ export default function HomePage() {
             <div className="grid">
               {funds.map((f) => (
                 <div key={f.code} className="col-6">
-                  <div className="glass card" role="article" aria-label={`${f.name} 基金信息`}>
+                  <div className="glass card">
                     <div className="row" style={{ marginBottom: 10 }}>
                       <div className="title">
                         <span>{f.name}</span>
@@ -347,7 +382,6 @@ export default function HomePage() {
                         </div>
                         <button
                           className="icon-button danger"
-                          aria-label={`删除基金 ${f.code}`}
                           onClick={() => removeFund(f.code)}
                           title="删除"
                         >
@@ -362,17 +396,21 @@ export default function HomePage() {
                     </div>
                     <div style={{ marginBottom: 8 }} className="title">
                       <span>前10重仓股票</span>
-                      <span className="muted">持仓占比</span>
+                      <span className="muted">涨跌幅 / 占比</span>
                     </div>
                     {Array.isArray(f.holdings) && f.holdings.length ? (
-                      <div className="list" role="list">
+                      <div className="list">
                         {f.holdings.map((h, idx) => (
-                          <div className="item" role="listitem" key={idx}>
-                            <span className="name">
-                              {h.name ? h.name : h.code}
-                              {h.code ? ` (${h.code})` : ''}
-                            </span>
-                            <span className="weight">{h.weight}</span>
+                          <div className="item" key={idx}>
+                            <span className="name">{h.name}</span>
+                            <div className="values">
+                              {typeof h.change === 'number' && (
+                                <span className={`badge ${h.change > 0 ? 'up' : h.change < 0 ? 'down' : ''}`} style={{ marginRight: 8 }}>
+                                  {h.change > 0 ? '+' : ''}{h.change.toFixed(2)}%
+                                </span>
+                              )}
+                              <span className="weight">{h.weight}</span>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -387,14 +425,15 @@ export default function HomePage() {
         </div>
       </div>
 
-      <div className="footer">数据源：基金估值与重仓来自东方财富公开接口，可能存在延迟</div>
+      <div className="footer">数据源：实时估值与重仓直连东方财富，无需后端，部署即用</div>
+
       {settingsOpen && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="刷新频率设置" onClick={() => setSettingsOpen(false)}>
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="设置" onClick={() => setSettingsOpen(false)}>
           <div className="glass card modal" onClick={(e) => e.stopPropagation()}>
             <div className="title" style={{ marginBottom: 12 }}>
               <SettingsIcon width="20" height="20" />
               <span>设置</span>
-              <span className="muted">配置刷新频率与数据源</span>
+              <span className="muted">配置刷新频率</span>
             </div>
             
             <div className="form-group" style={{ marginBottom: 16 }}>
@@ -421,41 +460,6 @@ export default function HomePage() {
                 onChange={(e) => setTempSeconds(Number(e.target.value))}
                 placeholder="自定义秒数"
               />
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 16 }}>
-              <div className="muted" style={{ marginBottom: 8, fontSize: '0.8rem' }}>数据源模式</div>
-              <div className="chips" style={{ marginBottom: 12 }}>
-                <button
-                  type="button"
-                  className={`chip ${!tempUseJsonp ? 'active' : ''}`}
-                  onClick={() => setTempUseJsonp(false)}
-                >
-                  后端 API (推荐)
-                </button>
-                <button
-                  type="button"
-                  className={`chip ${tempUseJsonp ? 'active' : ''}`}
-                  onClick={() => setTempUseJsonp(true)}
-                >
-                  JSONP 直连 (免跨域)
-                </button>
-              </div>
-              {!tempUseJsonp && (
-                <div style={{ marginTop: 8 }}>
-                  <div className="muted" style={{ marginBottom: 4, fontSize: '0.75rem' }}>API 基础地址 (绝对路径)</div>
-                  <input
-                    className="input"
-                    type="text"
-                    value={tempApiBase}
-                    onChange={(e) => setTempApiBase(e.target.value)}
-                    placeholder="/api 或 https://your-backend.com/api"
-                  />
-                  <div className="muted" style={{ marginTop: 4, fontSize: '0.7rem' }}>
-                    部署到 GitHub Pages 时，请填写完整的后端域名地址。
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="row" style={{ justifyContent: 'flex-end', marginTop: 24 }}>
