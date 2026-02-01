@@ -90,6 +90,8 @@ export default function HomePage() {
       } else {
         next.add(code);
       }
+      // 同步到本地存储
+      localStorage.setItem('collapsedCodes', JSON.stringify(Array.from(next)));
       return next;
     });
   };
@@ -105,6 +107,11 @@ export default function HomePage() {
       if (Number.isFinite(savedMs) && savedMs >= 5000) {
         setRefreshMs(savedMs);
         setTempSeconds(Math.round(savedMs / 1000));
+      }
+      // 加载收起状态
+      const savedCollapsed = JSON.parse(localStorage.getItem('collapsedCodes') || '[]');
+      if (Array.isArray(savedCollapsed)) {
+        setCollapsedCodes(new Set(savedCollapsed));
       }
     } catch {}
   }, []);
@@ -303,6 +310,15 @@ export default function HomePage() {
     const next = funds.filter((f) => f.code !== removeCode);
     setFunds(next);
     localStorage.setItem('funds', JSON.stringify(next));
+
+    // 同步删除展开收起状态
+    setCollapsedCodes(prev => {
+      if (!prev.has(removeCode)) return prev;
+      const nextSet = new Set(prev);
+      nextSet.delete(removeCode);
+      localStorage.setItem('collapsedCodes', JSON.stringify(Array.from(nextSet)));
+      return nextSet;
+    });
   };
 
   const manualRefresh = async () => {
