@@ -1515,6 +1515,27 @@ export default function HomePage() {
   };
 
   useEffect(() => {
+    const isAnyModalOpen = 
+      settingsOpen || 
+      feedbackOpen || 
+      addResultOpen || 
+      addFundToGroupOpen || 
+      groupManageOpen || 
+      groupModalOpen || 
+      successModal.open;
+    
+    if (isAnyModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [settingsOpen, feedbackOpen, addResultOpen, addFundToGroupOpen, groupManageOpen, groupModalOpen, successModal.open]);
+
+  useEffect(() => {
     const onKey = (ev) => {
       if (ev.key === 'Escape' && settingsOpen) setSettingsOpen(false);
     };
