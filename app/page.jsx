@@ -817,19 +817,31 @@ function TradeModal({ type, fund, onClose, onConfirm }) {
 
 function HoldingEditModal({ fund, holding, onClose, onSave }) {
   const [share, setShare] = useState(holding?.share || '');
-  const [cost, setCost] = useState(holding?.cost || '');
+  const [costAmount, setCostAmount] = useState(() => {
+    if (!holding) return '';
+    if (typeof holding.costAmount === 'number') return holding.costAmount;
+    if (typeof holding.cost === 'number' && typeof holding.share === 'number') return holding.cost * holding.share;
+    return '';
+  });
+  const [profitTotal, setProfitTotal] = useState(holding?.profitTotal || '');
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!share || !cost) return; // 简单校验
+    if (!share || !costAmount || !profitTotal) return;
+    const shareNum = Number(share);
+    const costAmountNum = Number(costAmount);
+    const profitTotalNum = Number(profitTotal);
+    const costUnit = shareNum > 0 ? costAmountNum / shareNum : 0;
     onSave({
-      share: Number(share),
-      cost: Number(cost)
+      share: shareNum,
+      costAmount: costAmountNum,
+      cost: costUnit,
+      profitTotal: profitTotalNum
     });
     onClose();
   };
 
-  const isValid = share && cost && !isNaN(share) && !isNaN(cost);
+  const isValid = share && costAmount && profitTotal && !isNaN(share) && !isNaN(costAmount) && !isNaN(profitTotal);
 
   return (
     <motion.div
@@ -892,13 +904,31 @@ function HoldingEditModal({ fund, holding, onClose, onSave }) {
             <input
               type="number"
               step="any"
-              className={`input ${!cost ? 'error' : ''}`}
-              value={cost}
-              onChange={(e) => setCost(e.target.value)}
-              placeholder="请输入持仓成本价"
+              className={`input ${!costAmount ? 'error' : ''}`}
+              value={costAmount}
+              onChange={(e) => setCostAmount(e.target.value)}
+              placeholder="请输入持仓成本价（¥）"
               style={{ 
                 width: '100%',
-                border: !cost ? '1px solid var(--danger)' : undefined
+                border: !costAmount ? '1px solid var(--danger)' : undefined
+              }}
+            />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 24 }}>
+            <label className="muted" style={{ display: 'block', marginBottom: 8, fontSize: '14px' }}>
+              持有收益 <span style={{ color: 'var(--danger)' }}>*</span>
+            </label>
+            <input
+              type="number"
+              step="any"
+              className={`input ${!profitTotal ? 'error' : ''}`}
+              value={profitTotal}
+              onChange={(e) => setProfitTotal(e.target.value)}
+              placeholder="请输入持有收益（¥）"
+              style={{ 
+                width: '100%',
+                border: !profitTotal ? '1px solid var(--danger)' : undefined
               }}
             />
           </div>
@@ -1440,8 +1470,12 @@ function GroupSummary({ funds, holdings, groupName, getProfit }) {
         totalProfitToday += profit.profitToday;
         if (profit.profitTotal !== null) {
           totalHoldingReturn += profit.profitTotal;
-          if (holding && typeof holding.cost === 'number' && typeof holding.share === 'number') {
-            totalCost += holding.cost * holding.share;
+          if (holding && typeof holding.share === 'number') {
+            if (typeof holding.costAmount === 'number') {
+              totalCost += holding.costAmount;
+            } else if (typeof holding.cost === 'number') {
+              totalCost += holding.cost * holding.share;
+            }
           }
         }
       }
@@ -1567,8 +1601,7 @@ export default function HomePage() {
   const [tradeModal, setTradeModal] = useState({ open: false, fund: null, type: 'buy' }); // type: 'buy' | 'sell'
   const [clearConfirm, setClearConfirm] = useState(null); // { fund }
   const [donateOpen, setDonateOpen] = useState(false);
-  const [holdings, setHoldings] = useState({}); // { [code]: { share: number, cost: number } }
-  const [percentModes, setPercentModes] = useState({}); // { [code]: boolean }
+  const [holdings, setHoldings] = useState({}); // { [code]: { share: number, cost?: number, costAmount?: number, profitTotal?: number } }
   const [isTradingDay, setIsTradingDay] = useState(true); // 默认为交易日，通过接口校正
   const tabsRef = useRef(null);
 
@@ -1684,15 +1717,24 @@ export default function HomePage() {
     let currentNav;
     let profitToday;
 
+    const share = holding.share;
+    const costAmount = typeof holding.costAmount === 'number'
+      ? holding.costAmount
+      : (typeof holding.cost === 'number' ? holding.cost * share : null);
+    const costUnit = typeof holding.costAmount === 'number'
+      ? (share > 0 ? holding.costAmount / share : 0)
+      : (typeof holding.cost === 'number' ? holding.cost : null);
+
     if (!useValuation) {
       // 使用确权净值 (dwjz)
       currentNav = Number(fund.dwjz);
       if (!currentNav) return null;
 
-      const amount = holding.share * currentNav;
+      const amount = share * currentNav;
       // 优先用 zzl (真实涨跌幅), 降级用 gszzl
       const rate = fund.zzl !== undefined ? Number(fund.zzl) : (Number(fund.gszzl) || 0);
-      profitToday = amount - (amount / (1 + rate / 100));
+      const denom = 1 + rate / 100;
+      profitToday = denom ? (amount - (amount / denom)) : 0;
     } else {
       // 否则使用估值
       currentNav = fund.estPricedCoverage > 0.05 
@@ -1701,31 +1743,51 @@ export default function HomePage() {
       
       if (!currentNav) return null;
 
-      const amount = holding.share * currentNav;
+      const amount = share * currentNav;
       // 估值涨跌幅
       const gzChange = fund.estPricedCoverage > 0.05 ? fund.estGszzl : (Number(fund.gszzl) || 0);
-      profitToday = amount - (amount / (1 + gzChange / 100));
+      const denom = 1 + gzChange / 100;
+      profitToday = denom ? (amount - (amount / denom)) : 0;
     }
       
     // 持仓金额
-    const amount = holding.share * currentNav;
+    const amount = share * currentNav;
     
-    // 总收益 = (当前净值 - 成本价) * 份额
-    const profitTotal = typeof holding.cost === 'number' 
-      ? (currentNav - holding.cost) * holding.share
-      : null;
+    let profitTotal = null;
+    if (typeof holding.profitTotal === 'number') {
+      profitTotal = holding.profitTotal;
+    } else if (typeof costUnit === 'number') {
+      profitTotal = (currentNav - costUnit) * share;
+    }
+
+    const profitRate = costAmount && profitTotal !== null ? (profitTotal / costAmount) * 100 : null;
+
+    let profitYesterday = null;
+    const confirmedNav = Number(fund.dwjz);
+    if (confirmedNav) {
+      const rateConfirmed = fund.zzl !== undefined ? Number(fund.zzl) : (Number(fund.gszzl) || 0);
+      const confirmedAmount = share * confirmedNav;
+      const denom = 1 + rateConfirmed / 100;
+      profitYesterday = denom ? (confirmedAmount - (confirmedAmount / denom)) : 0;
+    }
 
     return {
+      share,
+      costAmount,
+      costUnit,
       amount,
       profitToday,
-      profitTotal
+      profitTotal,
+      profitRate,
+      profitYesterday
     };
   };
 
   const handleSaveHolding = (code, data) => {
     setHoldings(prev => {
       const next = { ...prev };
-      if (data.share === null && data.cost === null) {
+      const shouldDelete = data && Object.values(data).every(v => v === null);
+      if (shouldDelete) {
         delete next[code];
       } else {
         next[code] = data;
@@ -1749,13 +1811,13 @@ export default function HomePage() {
 
   const handleClearConfirm = () => {
     if (clearConfirm?.fund) {
-      handleSaveHolding(clearConfirm.fund.code, { share: null, cost: null });
+      handleSaveHolding(clearConfirm.fund.code, { share: null, cost: null, costAmount: null, profitTotal: null });
     }
     setClearConfirm(null);
   };
 
   const handleTrade = (fund, data) => {
-    const current = holdings[fund.code] || { share: 0, cost: 0 };
+    const current = holdings[fund.code] || { share: 0, cost: 0, costAmount: 0, profitTotal: null };
     const isBuy = tradeModal.type === 'buy';
     
     let newShare, newCost;
@@ -1767,17 +1829,36 @@ export default function HomePage() {
       // 否则回退到用 share * price 计算（减仓或旧逻辑）
       const buyCost = data.totalCost !== undefined ? data.totalCost : (data.price * data.share);
       
+      const currentCostAmount = typeof current.costAmount === 'number'
+        ? current.costAmount
+        : (typeof current.cost === 'number' ? current.cost * current.share : 0);
+      const nextCostAmount = currentCostAmount + buyCost;
+
       // 加权平均成本 = (原持仓成本 * 原份额 + 本次买入总花费) / 新总份额
       // 注意：这里默认将手续费也计入成本（如果 totalCost 包含了手续费）
-      newCost = (current.cost * current.share + buyCost) / newShare;
+      newCost = newShare > 0 ? (nextCostAmount / newShare) : 0;
+
+      handleSaveHolding(fund.code, {
+        share: newShare,
+        cost: newCost,
+        costAmount: nextCostAmount,
+        profitTotal: typeof current.profitTotal === 'number' ? current.profitTotal : null
+      });
     } else {
       newShare = Math.max(0, current.share - data.share);
       // 减仓不改变单位成本，只减少份额
       newCost = current.cost;
       if (newShare === 0) newCost = 0;
-    }
 
-    handleSaveHolding(fund.code, { share: newShare, cost: newCost });
+      const nextCostAmount = newCost * newShare;
+
+      handleSaveHolding(fund.code, {
+        share: newShare,
+        cost: newCost,
+        costAmount: nextCostAmount,
+        profitTotal: typeof current.profitTotal === 'number' ? current.profitTotal : null
+      });
+    }
     setTradeModal({ open: false, fund: null, type: 'buy' });
   };
 
@@ -3134,21 +3215,23 @@ export default function HomePage() {
                             />
                           </div>
                           
-                          <div className="row" style={{ marginBottom: 12 }}>
+                          <div style={{ marginBottom: 12 }}>
                             {(() => {
                               const holding = holdings[f.code];
                               const profit = getHoldingProfit(f, holding);
                               
                               if (!profit) {
                                 return (
-                                  <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
-                                    <span className="label">持仓金额</span>
-                                    <div 
-                                      className="value muted" 
-                                      style={{ fontSize: '14px', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
-                                      onClick={() => setHoldingModal({ open: true, fund: f })}
-                                    >
-                                      未设置 <SettingsIcon width="12" height="12" />
+                                  <div className="row">
+                                    <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
+                                      <span className="label">持仓金额</span>
+                                      <div 
+                                        className="value muted" 
+                                        style={{ fontSize: '14px', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+                                        onClick={() => setHoldingModal({ open: true, fund: f })}
+                                      >
+                                        未设置 <SettingsIcon width="12" height="12" />
+                                      </div>
                                     </div>
                                   </div>
                                 );
@@ -3156,42 +3239,85 @@ export default function HomePage() {
 
                               return (
                                 <>
-                                  <div 
-                                    className="stat" 
-                                    style={{ cursor: 'pointer', flexDirection: 'column', gap: 4 }}
-                                    onClick={() => setActionModal({ open: true, fund: f })}
-                                  >
-                                    <span className="label" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                      持仓金额 <SettingsIcon width="12" height="12" style={{ opacity: 0.7 }} />
-                                    </span>
-                                    <span className="value">¥{profit.amount.toFixed(2)}</span>
-                                  </div>
-                                  <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
-                                    <span className="label">当日盈亏</span>
-                                    <span className={`value ${profit.profitToday > 0 ? 'up' : profit.profitToday < 0 ? 'down' : ''}`}>
-                                      {profit.profitToday > 0 ? '+' : profit.profitToday < 0 ? '-' : ''}¥{Math.abs(profit.profitToday).toFixed(2)}
-                                    </span>
-                                  </div>
-                                  {profit.profitTotal !== null && (
+                                  <div className="row" style={{ marginBottom: 12 }}>
                                     <div 
-                                      className="stat"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setPercentModes(prev => ({ ...prev, [f.code]: !prev[f.code] }));
-                                      }}
+                                      className="stat" 
                                       style={{ cursor: 'pointer', flexDirection: 'column', gap: 4 }}
-                                      title="点击切换金额/百分比"
+                                      onClick={() => setActionModal({ open: true, fund: f })}
                                     >
-                                      <span className="label">持有收益{percentModes[f.code] ? '(%)' : ''}</span>
-                                      <span className={`value ${profit.profitTotal > 0 ? 'up' : profit.profitTotal < 0 ? 'down' : ''}`}>
-                                        {profit.profitTotal > 0 ? '+' : profit.profitTotal < 0 ? '-' : ''}
-                                        {percentModes[f.code] 
-                                          ? `${Math.abs((holding.cost * holding.share) ? (profit.profitTotal / (holding.cost * holding.share)) * 100 : 0).toFixed(2)}%`
-                                          : `¥${Math.abs(profit.profitTotal).toFixed(2)}`
-                                        }
+                                      <span className="label" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        持仓金额 <SettingsIcon width="12" height="12" style={{ opacity: 0.7 }} />
+                                      </span>
+                                      <span className="value">¥{profit.amount.toFixed(2)}</span>
+                                    </div>
+
+                                    <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
+                                      <span className="label">昨日收益</span>
+                                      {typeof profit.profitYesterday === 'number' ? (
+                                        <span className={`value ${profit.profitYesterday > 0 ? 'up' : profit.profitYesterday < 0 ? 'down' : ''}`}>
+                                          {profit.profitYesterday > 0 ? '+' : profit.profitYesterday < 0 ? '-' : ''}¥{Math.abs(profit.profitYesterday).toFixed(2)}
+                                        </span>
+                                      ) : (
+                                        <span className="value muted">—</span>
+                                      )}
+                                    </div>
+
+                                    <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
+                                      <span className="label">当日盈亏</span>
+                                      <span className={`value ${profit.profitToday > 0 ? 'up' : profit.profitToday < 0 ? 'down' : ''}`}>
+                                        {profit.profitToday > 0 ? '+' : profit.profitToday < 0 ? '-' : ''}¥{Math.abs(profit.profitToday).toFixed(2)}
                                       </span>
                                     </div>
-                                  )}
+                                  </div>
+
+                                  <div className="row" style={{ marginBottom: 12 }}>
+                                    <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
+                                      <span className="label">持有收益</span>
+                                      {typeof profit.profitTotal === 'number' ? (
+                                        <span className={`value ${profit.profitTotal > 0 ? 'up' : profit.profitTotal < 0 ? 'down' : ''}`}>
+                                          {profit.profitTotal > 0 ? '+' : profit.profitTotal < 0 ? '-' : ''}¥{Math.abs(profit.profitTotal).toFixed(2)}
+                                        </span>
+                                      ) : (
+                                        <span className="value muted">—</span>
+                                      )}
+                                    </div>
+
+                                    <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
+                                      <span className="label">持有收益率</span>
+                                      {typeof profit.profitRate === 'number' ? (
+                                        <span className={`value ${profit.profitRate > 0 ? 'up' : profit.profitRate < 0 ? 'down' : ''}`}>
+                                          {profit.profitRate > 0 ? '+' : profit.profitRate < 0 ? '-' : ''}{Math.abs(profit.profitRate).toFixed(2)}%
+                                        </span>
+                                      ) : (
+                                        <span className="value muted">—</span>
+                                      )}
+                                    </div>
+
+                                    <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
+                                      <span className="label">持有份额</span>
+                                      <span className="value">{profit.share.toFixed(2)}</span>
+                                    </div>
+                                  </div>
+
+                                  <div className="row">
+                                    <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
+                                      <span className="label">持仓成本价</span>
+                                      {typeof profit.costAmount === 'number' ? (
+                                        <span className="value">¥{profit.costAmount.toFixed(2)}</span>
+                                      ) : (
+                                        <span className="value muted">—</span>
+                                      )}
+                                    </div>
+
+                                    <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
+                                      <span className="label">持仓成本单价</span>
+                                      {typeof profit.costUnit === 'number' ? (
+                                        <span className="value">¥{profit.costUnit.toFixed(4)}</span>
+                                      ) : (
+                                        <span className="value muted">—</span>
+                                      )}
+                                    </div>
+                                  </div>
                                 </>
                               );
                             })()}
