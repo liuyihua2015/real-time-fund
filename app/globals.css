@@ -419,7 +419,7 @@ input[type="number"] {
 
 .table-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1.5fr 60px;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1.5fr 60px;
   align-items: center;
   gap: 12px;
   padding: 12px 24px !important;
@@ -437,7 +437,7 @@ input[type="number"] {
 
 .table-header-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1.5fr 60px;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1.5fr 60px;
   gap: 12px;
   padding: 16px 24px;
   background: rgba(255, 255, 255, 0.05);
@@ -454,6 +454,18 @@ input[type="number"] {
 .table-cell {
   display: flex;
   align-items: center;
+}
+
+.change-inline {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.change-meta {
+  font-size: 11px;
 }
 
 .text-right { text-align: right; justify-content: flex-end; }
@@ -489,6 +501,8 @@ input[type="number"] {
     grid-template-columns: 1fr 80px 80px;
     grid-template-areas: 
       "name value change"
+      "name hold pnl"
+      "name holdIncome holdIncome"
       "name time action";
     gap: 4px 12px;
     padding: 12px !important;
@@ -496,6 +510,18 @@ input[type="number"] {
   .name-cell { grid-area: name; }
   .value-cell { grid-area: value; }
   .change-cell { grid-area: change; }
+  .hold-cell { 
+    grid-area: hold; 
+    justify-content: flex-end;
+  }
+  .pnl-cell { 
+    grid-area: pnl; 
+    justify-content: flex-end;
+  }
+  .hold-income-cell { 
+    grid-area: holdIncome; 
+    justify-content: flex-end;
+  }
   .time-cell { 
     grid-area: time; 
     justify-content: flex-end;
@@ -506,6 +532,12 @@ input[type="number"] {
   }
   .table-cell.time-cell span {
     font-size: 10px !important;
+  }
+  .change-inline {
+    gap: 6px;
+  }
+  .change-meta {
+    font-size: 10px;
   }
 }
 
