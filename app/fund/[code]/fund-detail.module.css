@@ -2,6 +2,7 @@
   position: relative;
   padding-top: 86px;
   padding-bottom: 40px;
+  min-height: 100vh;
 }
 
 .grain {
@@ -30,8 +31,9 @@
 .topbar {
   position: fixed;
   top: 16px;
-  left: 16px;
-  right: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(1120px, calc(100% - 32px));
   z-index: 60;
   padding: 10px 12px;
   display: flex;
@@ -384,9 +386,162 @@
   line-height: 1.55;
 }
 
+.holdingsPanel {
+  grid-column: span 8;
+  position: relative;
+  overflow: hidden;
+  padding: 18px 18px 16px;
+}
+
+.holdingsPanel:before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 18px;
+  background: linear-gradient(140deg, rgba(34, 211, 238, 0.12), rgba(245, 158, 11, 0.08), rgba(255, 255, 255, 0.02));
+  filter: blur(18px);
+  opacity: 0.75;
+}
+
+.holdingsPanelInner {
+  position: relative;
+}
+
+.myHoldBox {
+  border-radius: 16px;
+}
+
+.myHoldHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.myHoldTitle {
+  font-size: 13px;
+  color: rgba(229, 231, 235, 0.9);
+  letter-spacing: 0.18px;
+  font-weight: 900;
+}
+
+.myHoldSubtitle {
+  margin-top: 3px;
+  font-size: 12px;
+  color: rgba(229, 231, 235, 0.62);
+}
+
+.myHoldActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.myHoldBtn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(34, 211, 238, 0.10);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease;
+}
+
+.myHoldBtn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(34, 211, 238, 0.35);
+}
+
+.myHoldBtnDanger {
+  appearance: none;
+  border: 1px solid rgba(248, 113, 113, 0.22);
+  background: rgba(248, 113, 113, 0.10);
+  color: rgba(255, 255, 255, 0.92);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease;
+}
+
+.myHoldBtnDanger:hover {
+  transform: translateY(-1px);
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+.myHoldHero {
+  margin-top: 12px;
+  padding: 12px 12px 11px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.10));
+}
+
+.myHoldHeroK {
+  font-size: 12px;
+  color: rgba(229, 231, 235, 0.62);
+  letter-spacing: 0.2px;
+}
+
+.myHoldHeroV {
+  margin-top: 8px;
+  font-size: 22px;
+  font-weight: 950;
+  letter-spacing: 0.2px;
+  color: var(--text);
+}
+
+.myHoldHeroMeta {
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(229, 231, 235, 0.62);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.myHoldGrid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+}
+
+.myHoldItem {
+  padding: 10px 10px 9px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(0, 0, 0, 0.10);
+}
+
+.myHoldK {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: inherit;
+}
+
+.myHoldV {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 850;
+  word-break: break-word;
+  font-family: inherit;
+}
+
+.myHoldEmpty {
+  margin-top: 10px;
+  color: rgba(229, 231, 235, 0.86);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 @media (max-width: 1024px) {
   .heroMain,
   .heroAside,
+  .holdingsPanel,
   .lowerLeft,
   .lowerRight {
     grid-column: span 12;
@@ -410,6 +565,14 @@
     font-size: 22px;
   }
 
+  .holdingsPanel {
+    padding: 16px 16px 14px;
+  }
+
+  .myHoldGrid {
+    grid-template-columns: 1fr;
+  }
+
   .shell {
     padding-top: 78px;
   }
@@ -417,7 +580,8 @@
   .topbar {
     top: 0;
     left: 0;
-    right: 0;
+    transform: none;
+    width: 100%;
     border-radius: 0;
     border-top: none;
     border-left: none;

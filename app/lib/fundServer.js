@@ -168,27 +168,86 @@ function parseHoldingsFromEastmoney(content) {
     .slice(0, 20)
     .map((row) => {
       const cols = row.match(/<td[\s\S]*?<\/td>/g) || [];
-      if (cols.length < 4) return null;
-      const name = cols[1].replace(/<[^>]+>/g, '').trim();
-      const code = cols[2].replace(/<[^>]+>/g, '').trim();
+      if (cols.length < 7) return null;
+      const stockCode = cols[1]?.replace(/<[^>]+>/g, '').trim() || '';
+      const stockName = cols[2]?.replace(/<[^>]+>/g, '').trim() || '';
+      const changeText = cols[4] ? cols[4].replace(/<[^>]+>/g, '').trim() : '';
       const ratioText = cols[6] ? cols[6].replace(/<[^>]+>/g, '').trim() : '';
+      const changePct = Number(changeText.replace('%', ''));
       const ratio = Number(ratioText.replace('%', ''));
       return {
-        name: name || null,
-        code: code || null,
-        ratioPct: Number.isFinite(ratio) ? ratio : null
+        name: stockName || null,
+        code: stockCode || null,
+        ratioPct: Number.isFinite(ratio) ? ratio : null,
+        changePct: Number.isFinite(changePct) ? changePct : null
       };
     })
     .filter((x) => x && x.name);
 }
 
+function decodeJsStringLiteral(s) {
+  if (typeof s !== 'string') return '';
+  try {
+    return JSON.parse(`"${s.replace(/"/g, '\\"')}"`);
+  } catch {
+    return s;
+  }
+}
+
+function extractEastmoneyApiDataContent(text) {
+  const t = stripBom(text || '');
+  const m =
+    t.match(/content:\s*\"([\s\S]*?)\"\s*,\s*arryear\s*:/) ||
+    t.match(/content:\s*\"([\s\S]*?)\"\s*,\s*curyear\s*:/) ||
+    t.match(/content:\s*\"([\s\S]*?)\"\s*\}\s*;?\s*$/);
+  if (!m) return null;
+  return decodeJsStringLiteral(m[1]);
+}
+
+function getTencentPrefix(code) {
+  const c = String(code || '');
+  if (c.startsWith('6') || c.startsWith('9')) return 'sh';
+  if (c.startsWith('0') || c.startsWith('3')) return 'sz';
+  if (c.startsWith('4') || c.startsWith('8')) return 'bj';
+  return 'sz';
+}
+
+async function fetchTencentStockChangePct(codes) {
+  const list = Array.isArray(codes) ? codes.filter((c) => /^\d{6}$/.test(String(c))) : [];
+  if (!list.length) return new Map();
+  const symbols = list.map((c) => `s_${getTencentPrefix(c)}${c}`).join(',');
+  const url = `https://qt.gtimg.cn/q=${symbols}`;
+  const text = await fetchText(url, { cache: 'no-store' });
+  const map = new Map();
+  const re = /v_s_([a-z]{2})(\d{6})="([^"]*)"/g;
+  let m;
+  while ((m = re.exec(text))) {
+    const code = m[2];
+    const payload = m[3] || '';
+    const parts = payload.split('~');
+    const pct = parts.length > 5 ? Number(parts[5]) : NaN;
+    if (Number.isFinite(pct)) map.set(code, pct);
+  }
+  return map;
+}
+
 async function fetchTopHoldings(code) {
   const url = `https://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code=${code}&topline=10&year=&month=&rt=${Date.now()}`;
   const text = await fetchText(url, { cache: 'no-store' });
-  const jsonText = extractBetween(text, 'apidata=', ';');
-  const data = jsonText ? safeJsonParse(jsonText) : null;
-  if (!data?.content) return [];
-  return parseHoldingsFromEastmoney(data.content);
+  const content = extractEastmoneyApiDataContent(text);
+  if (!content) return [];
+  const holdings = parseHoldingsFromEastmoney(content).slice(0, 10);
+  if (!holdings.length) return [];
+  try {
+    const codes = holdings.map((h) => h.code).filter(Boolean);
+    const pctMap = await fetchTencentStockChangePct(codes);
+    holdings.forEach((h) => {
+      const pct = pctMap.get(h.code);
+      if (Number.isFinite(pct)) h.changePct = pct;
+    });
+  } catch {
+  }
+  return holdings;
 }
 
 async function fetchPingZhongData(code) {

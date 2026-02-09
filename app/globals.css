@@ -293,6 +293,13 @@ input[type="number"] {
   border: 1px solid var(--border);
   background: #0b1220;
 }
+.item .values {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  min-width: 0;
+}
 .item .name {
   overflow: hidden;
   white-space: nowrap;
