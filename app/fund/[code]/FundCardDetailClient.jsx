@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence } from 'framer-motion';
 import HoldingEditModal from '../../components/HoldingEditModal';
+import HoldingActionModal from '../../components/HoldingActionModal';
+import TradeModalLite from '../../components/TradeModalLite';
 import ConfirmModal from '../../components/ConfirmModal';
 import { loadHoldings, saveHoldings, normalizeHolding } from '../../lib/holdingsStorage';
 
@@ -111,6 +113,8 @@ export default function FundCardDetailClient({ code }) {
   const [favorited, setFavorited] = useState(false);
   const [topOpen, setTopOpen] = useState(true);
   const [holdingModalOpen, setHoldingModalOpen] = useState(false);
+  const [actionOpen, setActionOpen] = useState(false);
+  const [tradeModal, setTradeModal] = useState({ open: false, type: 'buy' });
   const [holding, setHolding] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
@@ -243,6 +247,67 @@ export default function FundCardDetailClient({ code }) {
     setHolding(normalized);
   };
 
+  const clearHolding = () => {
+    const all = loadHoldings();
+    delete all[code];
+    saveHoldings(all);
+    setHolding(null);
+  };
+
+  const applyTrade = (payload) => {
+    const current = holding || {
+      share: 0,
+      costAmount: 0,
+      cost: 0,
+      profitTotal: null
+    };
+
+    const curShare = typeof current.share === 'number' && Number.isFinite(current.share) ? current.share : 0;
+    const curCostAmount =
+      typeof current.costAmount === 'number' && Number.isFinite(current.costAmount)
+        ? current.costAmount
+        : typeof current.cost === 'number' && Number.isFinite(current.cost)
+          ? current.cost * curShare
+          : 0;
+    const curCostUnit =
+      typeof current.cost === 'number' && Number.isFinite(current.cost)
+        ? current.cost
+        : curShare > 0
+          ? curCostAmount / curShare
+          : 0;
+
+    if (payload.type === 'buy') {
+      const buyShare = Number(payload.share);
+      const buyCost = Number(payload.totalCost);
+      if (!(buyShare > 0) || !(buyCost > 0)) return;
+      const newShare = curShare + buyShare;
+      const nextCostAmount = curCostAmount + buyCost;
+      const newCostUnit = newShare > 0 ? nextCostAmount / newShare : 0;
+      onSaveHolding({
+        share: newShare,
+        costAmount: nextCostAmount,
+        cost: newCostUnit,
+        profitTotal: typeof current.profitTotal === 'number' ? current.profitTotal : null
+      });
+    } else {
+      const sellShare = Number(payload.share);
+      if (!(sellShare > 0)) return;
+      const newShare = Math.max(0, curShare - sellShare);
+      const newCostUnit = newShare === 0 ? 0 : curCostUnit;
+      const nextCostAmount = newCostUnit * newShare;
+      if (newShare === 0) {
+        clearHolding();
+      } else {
+        onSaveHolding({
+          share: newShare,
+          costAmount: nextCostAmount,
+          cost: newCostUnit,
+          profitTotal: typeof current.profitTotal === 'number' ? current.profitTotal : null
+        });
+      }
+    }
+  };
+
   const topHoldings = Array.isArray(detail?.holdings) ? detail.holdings.slice(0, 10) : [];
 
   if (loading) {
@@ -344,10 +409,10 @@ export default function FundCardDetailClient({ code }) {
             <div
               className="stat"
               style={{ cursor: 'pointer', flexDirection: 'column', gap: 4, flex: '1 1 0%' }}
-              onClick={() => setHoldingModalOpen(true)}
+              onClick={() => setActionOpen(true)}
               role="button"
               tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && setHoldingModalOpen(true)}
+              onKeyDown={(e) => e.key === 'Enter' && setActionOpen(true)}
             >
               <span className="label" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 持仓金额 <SettingsTinyIcon width="12" height="12" style={{ opacity: 0.7 }} />
@@ -455,6 +520,41 @@ export default function FundCardDetailClient({ code }) {
           </div>
         ) : null}
       </div>
+
+      <AnimatePresence>
+        {actionOpen ? (
+          <HoldingActionModal
+            fund={{ code, name: detail?.name || code }}
+            hasHolding={!!holding}
+            onClose={() => setActionOpen(false)}
+            onAction={(type) => {
+              setActionOpen(false);
+              if (type === 'buy' || type === 'sell') {
+                setTradeModal({ open: true, type });
+              } else if (type === 'edit') {
+                setHoldingModalOpen(true);
+              } else if (type === 'clear') {
+                clearHolding();
+              }
+            }}
+          />
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {tradeModal.open ? (
+          <TradeModalLite
+            type={tradeModal.type}
+            fund={{ code, name: detail?.name || code }}
+            unitPrice={currentUnit}
+            onClose={() => setTradeModal({ open: false, type: 'buy' })}
+            onConfirm={(payload) => {
+              applyTrade(payload);
+              setTradeModal({ open: false, type: 'buy' });
+            }}
+          />
+        ) : null}
+      </AnimatePresence>
 
       <AnimatePresence>
         {holdingModalOpen ? (
