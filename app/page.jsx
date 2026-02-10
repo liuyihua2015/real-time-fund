@@ -6,9 +6,11 @@ import { motion, AnimatePresence, Reorder } from "framer-motion";
 import Announcement from "./components/Announcement";
 import HoldingEditModal from "./components/HoldingEditModal";
 import ConfirmModal from "./components/ConfirmModal";
+import HoldingActionModal from "./components/HoldingActionModal";
 import zhifubaoImg from "./assets/zhifubao.png";
 import weixinImg from "./assets/weixin.png";
 import { loadHoldings, saveHoldings } from "./lib/holdingsStorage";
+import { recognizeImage } from "./lib/ocrClient";
 
 function PlusIcon(props) {
   return (
@@ -940,107 +942,68 @@ function FeedbackModal({ onClose }) {
   );
 }
 
-function HoldingActionModal({ fund, onClose, onAction }) {
-  return (
-    <motion.div
-      className="modal-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-label="持仓操作"
-      onClick={onClose}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="glass card modal"
-        onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: "320px" }}
-      >
-        <div
-          className="title"
-          style={{ marginBottom: 20, justifyContent: "space-between" }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <SettingsIcon width="20" height="20" />
-            <span>持仓操作</span>
-          </div>
-          <button
-            className="icon-button"
-            onClick={onClose}
-            style={{ border: "none", background: "transparent" }}
-          >
-            <CloseIcon width="20" height="20" />
-          </button>
-        </div>
+function parseOcrNumber(raw) {
+  if (raw == null) return null;
+  const cleaned = String(raw).replace(/[,\s]/g, "");
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
 
-        <div style={{ marginBottom: 20, textAlign: "center" }}>
-          <div
-            className="fund-name"
-            style={{ fontWeight: 600, fontSize: "16px", marginBottom: 4 }}
-          >
-            {fund?.name}
-          </div>
-          <div className="muted" style={{ fontSize: "12px" }}>
-            #{fund?.code}
-          </div>
-        </div>
+function pad2(n) {
+  const s = String(n);
+  return s.length === 1 ? `0${s}` : s;
+}
 
-        <div className="grid" style={{ gap: 12 }}>
-          <button
-            hidden
-            className="button col-6"
-            onClick={() => onAction("buy")}
-            style={{
-              background: "rgba(34, 211, 238, 0.1)",
-              border: "1px solid var(--primary)",
-              color: "var(--primary)",
-            }}
-          >
-            加仓
-          </button>
-          <button
-            hidden
-            className="button col-6"
-            onClick={() => onAction("sell")}
-            style={{
-              background: "rgba(248, 113, 113, 0.1)",
-              border: "1px solid var(--danger)",
-              color: "var(--danger)",
-            }}
-          >
-            减仓
-          </button>
-          <button
-            className="button col-12"
-            onClick={() => onAction("edit")}
-            style={{
-              background: "rgba(255,255,255,0.05)",
-              color: "var(--text)",
-            }}
-          >
-            编辑持仓
-          </button>
-          <button
-            className="button col-12"
-            onClick={() => onAction("clear")}
-            style={{
-              marginTop: 8,
-              background: "linear-gradient(180deg, #ef4444, #f87171)",
-              border: "none",
-              color: "#2b0b0b",
-              fontWeight: 600,
-            }}
-          >
-            清空持仓
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
+function normalizeOcrDate(text) {
+  if (!text) return null;
+  const m = String(text).match(/(\d{4})[./-](\d{1,2})[./-](\d{1,2})/);
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mm = Number(m[2]);
+  const dd = Number(m[3]);
+  if (!Number.isFinite(y) || !Number.isFinite(mm) || !Number.isFinite(dd))
+    return null;
+  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+  return `${y}-${pad2(mm)}-${pad2(dd)}`;
+}
+
+function extractTradeFieldsFromOcr(text) {
+  const t = String(text || "")
+    .replace(/，/g, ",")
+    .replace(/：/g, ":")
+    .replace(/[￥¥]/g, "¥")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const pickByLabel = (label) => {
+    const re = new RegExp(`${label}[^0-9]{0,10}([0-9][0-9,]*\\.?[0-9]*)`);
+    const m = t.match(re);
+    return m ? parseOcrNumber(m[1]) : null;
+  };
+
+  const amount =
+    pickByLabel("成交金额") ??
+    pickByLabel("实付") ??
+    pickByLabel("付款") ??
+    pickByLabel("买入金额") ??
+    pickByLabel("金额");
+  const share = pickByLabel("份额") ?? pickByLabel("份") ?? pickByLabel("数量");
+  const price =
+    pickByLabel("单价") ?? pickByLabel("成交价") ?? pickByLabel("净值") ?? null;
+  const date = normalizeOcrDate(t);
+
+  const nums = Array.from(t.matchAll(/([0-9][0-9,]*\.?[0-9]*)/g))
+    .map((m) => parseOcrNumber(m[1]))
+    .filter((n) => typeof n === "number" && Number.isFinite(n));
+  const maxNum = nums.length ? Math.max(...nums) : null;
+
+  return {
+    amount: typeof amount === "number" && amount > 0 ? amount : null,
+    share: typeof share === "number" && share > 0 ? share : null,
+    price: typeof price === "number" && price > 0 ? price : null,
+    date,
+    fallbackMax: typeof maxNum === "number" && maxNum > 0 ? maxNum : null,
+  };
 }
 
 function TradeModal({ type, fund, onClose, onConfirm }) {
@@ -1051,6 +1014,13 @@ function TradeModal({ type, fund, onClose, onConfirm }) {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [isAfter3pm, setIsAfter3pm] = useState(new Date().getHours() >= 15);
   const [calcShare, setCalcShare] = useState(null);
+  const fileInputRef = useRef(null);
+  const [ocrStatus, setOcrStatus] = useState("idle");
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const [ocrText, setOcrText] = useState("");
+  const [ocrError, setOcrError] = useState("");
+  const [ocrFields, setOcrFields] = useState(null);
+  const [ocrShowText, setOcrShowText] = useState(false);
   const price =
     fund?.estPricedCoverage > 0.05
       ? fund?.estGsz
@@ -1071,6 +1041,52 @@ function TradeModal({ type, fund, onClose, onConfirm }) {
       setCalcShare(null);
     }
   }, [isBuy, amount, feeRate, price]);
+
+  const handlePickImage = async (file) => {
+    if (!file) return;
+    setOcrError("");
+    setOcrText("");
+    setOcrFields(null);
+    setOcrShowText(false);
+    setOcrStatus("loading");
+    setOcrProgress(0);
+    try {
+      const text = await recognizeImage(file, {
+        lang: "chi_sim+eng",
+        onProgress: (m) => {
+          if (m?.status) setOcrStatus(String(m.status));
+          if (typeof m?.progress === "number") setOcrProgress(m.progress);
+        },
+      });
+      setOcrText(text);
+      setOcrFields(extractTradeFieldsFromOcr(text));
+      setOcrStatus("done");
+    } catch (e) {
+      setOcrStatus("error");
+      setOcrError(e?.message ? String(e.message) : "识别失败");
+    }
+  };
+
+  const applyOcrToForm = () => {
+    const fields = ocrFields;
+    if (!fields) return;
+    if (fields.date) setDate(fields.date);
+    if (isBuy) {
+      const nextAmount =
+        fields.amount ??
+        (fields.fallbackMax && fields.fallbackMax >= 10
+          ? fields.fallbackMax
+          : null);
+      if (nextAmount != null) setAmount(String(nextAmount));
+    } else {
+      const nextShare =
+        fields.share ??
+        (fields.fallbackMax && fields.fallbackMax < 1000000
+          ? fields.fallbackMax
+          : null);
+      if (nextShare != null) setShare(String(nextShare));
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -1139,6 +1155,120 @@ function TradeModal({ type, fund, onClose, onConfirm }) {
           <div className="muted" style={{ fontSize: "12px" }}>
             #{fund?.code}
           </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <div className="row" style={{ gap: 10, alignItems: "center" }}>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                background: "rgba(255,255,255,0.05)",
+                color: "var(--text)",
+                padding: "10px 12px",
+              }}
+              disabled={
+                ocrStatus === "loading" || ocrStatus === "recognizing text"
+              }
+            >
+              从图片识别
+            </button>
+            <div className="muted" style={{ fontSize: 12, flex: 1 }}>
+              {ocrStatus === "idle"
+                ? "支持截图/交易回单"
+                : ocrStatus === "done"
+                  ? "识别完成"
+                  : ocrStatus === "error"
+                    ? "识别失败"
+                    : `${ocrStatus} ${Math.round((ocrProgress || 0) * 100)}%`}
+            </div>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const file = e?.target?.files?.[0];
+              e.target.value = "";
+              handlePickImage(file);
+            }}
+          />
+
+          {ocrError ? (
+            <div className="error-text" style={{ marginTop: 10 }}>
+              {ocrError}
+            </div>
+          ) : null}
+
+          {ocrFields &&
+          (ocrFields.amount ||
+            ocrFields.share ||
+            ocrFields.price ||
+            ocrFields.date) ? (
+            <div
+              className="glass"
+              style={{
+                marginTop: 10,
+                padding: "10px 12px",
+                borderRadius: 10,
+                background: "rgba(255,255,255,0.03)",
+              }}
+            >
+              <div className="row" style={{ gap: 10, alignItems: "center" }}>
+                <div className="muted" style={{ fontSize: 12, flex: 1 }}>
+                  {ocrFields.date ? `日期 ${ocrFields.date}` : null}
+                  {ocrFields.amount ? `  金额 ¥${ocrFields.amount}` : null}
+                  {ocrFields.share ? `  份额 ${ocrFields.share}` : null}
+                  {ocrFields.price ? `  单价 ${ocrFields.price}` : null}
+                </div>
+                <button
+                  type="button"
+                  className="button"
+                  onClick={applyOcrToForm}
+                  style={{
+                    padding: "8px 10px",
+                    background: "rgba(34, 211, 238, 0.12)",
+                    border: "1px solid rgba(34, 211, 238, 0.4)",
+                    color: "var(--primary)",
+                  }}
+                >
+                  填入表单
+                </button>
+              </div>
+              {ocrText ? (
+                <div style={{ marginTop: 8 }}>
+                  <button
+                    type="button"
+                    className="link-button"
+                    onClick={() => setOcrShowText((v) => !v)}
+                    style={{
+                      fontSize: 12,
+                      color: "var(--muted)",
+                      textDecoration: "underline",
+                      padding: 0,
+                    }}
+                  >
+                    {ocrShowText ? "收起识别文本" : "展开识别文本"}
+                  </button>
+                  {ocrShowText ? (
+                    <pre
+                      style={{
+                        whiteSpace: "pre-wrap",
+                        marginTop: 8,
+                        fontSize: 12,
+                        lineHeight: 1.5,
+                        opacity: 0.9,
+                      }}
+                    >
+                      {ocrText}
+                    </pre>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -4441,7 +4571,10 @@ export default function HomePage() {
                                     className="icon-button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setHoldingModal({ open: true, fund: f });
+                                      setActionModal({
+                                        open: true,
+                                        fund: f,
+                                      });
                                     }}
                                     title="设置持仓"
                                     style={{ width: "28px", height: "28px" }}
@@ -4573,7 +4706,7 @@ export default function HomePage() {
                                             tabIndex={0}
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              setHoldingModal({
+                                              setActionModal({
                                                 open: true,
                                                 fund: f,
                                               });
@@ -4581,7 +4714,7 @@ export default function HomePage() {
                                             onKeyDown={(e) => {
                                               if (e.key === "Enter") {
                                                 e.stopPropagation();
-                                                setHoldingModal({
+                                                setActionModal({
                                                   open: true,
                                                   fund: f,
                                                 });
@@ -4602,7 +4735,7 @@ export default function HomePage() {
                                               }}
                                               onClick={(e) => {
                                                 e.stopPropagation();
-                                                setHoldingModal({
+                                                setActionModal({
                                                   open: true,
                                                   fund: f,
                                                 });
@@ -4648,9 +4781,10 @@ export default function HomePage() {
                                             onKeyDown={(e) => {
                                               if (e.key === "Enter") {
                                                 e.stopPropagation();
-                                                setActionModal({
+                                                setTradeModal({
                                                   open: true,
                                                   fund: f,
+                                                  type: "buy",
                                                 });
                                               }
                                             }}
@@ -5162,6 +5296,20 @@ export default function HomePage() {
         {actionModal.open && (
           <HoldingActionModal
             fund={actionModal.fund}
+            hasHolding={(() => {
+              const code = actionModal?.fund?.code;
+              if (!code) return false;
+              const h = holdings?.[code];
+              if (!h) return false;
+              const share = Number(h.share);
+              const costAmount = Number(h.costAmount);
+              const profitTotal = Number(h.profitTotal);
+              return (
+                (Number.isFinite(share) && share > 0) ||
+                (Number.isFinite(costAmount) && costAmount > 0) ||
+                (Number.isFinite(profitTotal) && profitTotal !== 0)
+              );
+            })()}
             onClose={() => setActionModal({ open: false, fund: null })}
             onAction={(type) => handleAction(type, actionModal.fund)}
           />
