@@ -60,7 +60,8 @@ export function normalizeHolding(holding) {
       typeof costAmount === 'number' && Number.isFinite(costAmount) ? costAmount : null,
     cost: typeof costUnit === 'number' && Number.isFinite(costUnit) ? costUnit : null,
     profitTotal:
-      typeof profitTotal === 'number' && Number.isFinite(profitTotal) ? profitTotal : null
+      typeof profitTotal === 'number' && Number.isFinite(profitTotal) ? profitTotal : 0,
+    startDate: holding.startDate || null
   };
 }
 

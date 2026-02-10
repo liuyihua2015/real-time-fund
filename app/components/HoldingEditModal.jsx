@@ -42,6 +42,7 @@ export default function HoldingEditModal({ fund, holding, onClose, onSave }) {
     return '';
   });
   const [profitTotal, setProfitTotal] = useState(holding?.profitTotal || '');
+  const [startDate, setStartDate] = useState(holding?.startDate || new Date().toISOString().split('T')[0]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -54,7 +55,8 @@ export default function HoldingEditModal({ fund, holding, onClose, onSave }) {
       share: shareNum,
       costAmount: costAmountNum,
       cost: costUnit,
-      profitTotal: profitTotalNum
+      profitTotal: profitTotalNum,
+      startDate: startDate || null
     });
     onClose();
   };
@@ -160,6 +162,21 @@ export default function HoldingEditModal({ fund, holding, onClose, onSave }) {
               style={{
                 width: '100%',
                 border: !profitTotal ? '1px solid var(--danger)' : undefined
+              }}
+            />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 24 }}>
+            <label className="muted" style={{ display: 'block', marginBottom: 8, fontSize: '14px' }}>
+              开始持有日期 <span className="muted" style={{ fontSize: '12px', fontWeight: 400 }}>（计算每日盈亏的起始点）</span>
+            </label>
+            <input
+              type="date"
+              className="input"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              style={{
+                width: '100%',
               }}
             />
           </div>

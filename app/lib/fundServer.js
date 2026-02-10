@@ -118,7 +118,11 @@ function parsePingZhongHistory(pzSource) {
       const equityReturn = typeof p.equityReturn === 'number' ? p.equityReturn : Number(p.equityReturn);
       if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
       const d = new Date(x);
-      const date = Number.isFinite(d.getTime()) ? d.toISOString().slice(0, 10) : null;
+      // Use China Standard Time (UTC+8) to format the date
+      // toISOString() uses UTC, which might shift the date back by 1 day (e.g. 00:00 CST -> 16:00 UTC previous day)
+      const date = Number.isFinite(d.getTime())
+        ? new Date(x + 8 * 3600 * 1000).toISOString().slice(0, 10)
+        : null;
       return {
         date,
         nav: y,

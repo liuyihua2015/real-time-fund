@@ -7,6 +7,7 @@ import Announcement from "./components/Announcement";
 import HoldingEditModal from "./components/HoldingEditModal";
 import ConfirmModal from "./components/ConfirmModal";
 import HoldingActionModal from "./components/HoldingActionModal";
+import TradeModal from "./components/TradeModal";
 import zhifubaoImg from "./assets/zhifubao.png";
 import weixinImg from "./assets/weixin.png";
 import { loadHoldings, saveHoldings } from "./lib/holdingsStorage";
@@ -942,564 +943,6 @@ function FeedbackModal({ onClose }) {
   );
 }
 
-function parseOcrNumber(raw) {
-  if (raw == null) return null;
-  const cleaned = String(raw).replace(/[,\s]/g, "");
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
-}
-
-function pad2(n) {
-  const s = String(n);
-  return s.length === 1 ? `0${s}` : s;
-}
-
-function normalizeOcrDate(text) {
-  if (!text) return null;
-  const m = String(text).match(/(\d{4})[./-](\d{1,2})[./-](\d{1,2})/);
-  if (!m) return null;
-  const y = Number(m[1]);
-  const mm = Number(m[2]);
-  const dd = Number(m[3]);
-  if (!Number.isFinite(y) || !Number.isFinite(mm) || !Number.isFinite(dd))
-    return null;
-  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
-  return `${y}-${pad2(mm)}-${pad2(dd)}`;
-}
-
-function extractTradeFieldsFromOcr(text) {
-  const t = String(text || "")
-    .replace(/，/g, ",")
-    .replace(/：/g, ":")
-    .replace(/[￥¥]/g, "¥")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  const pickByLabel = (label) => {
-    const re = new RegExp(`${label}[^0-9]{0,10}([0-9][0-9,]*\\.?[0-9]*)`);
-    const m = t.match(re);
-    return m ? parseOcrNumber(m[1]) : null;
-  };
-
-  const amount =
-    pickByLabel("成交金额") ??
-    pickByLabel("实付") ??
-    pickByLabel("付款") ??
-    pickByLabel("买入金额") ??
-    pickByLabel("金额");
-  const share = pickByLabel("份额") ?? pickByLabel("份") ?? pickByLabel("数量");
-  const price =
-    pickByLabel("单价") ?? pickByLabel("成交价") ?? pickByLabel("净值") ?? null;
-  const date = normalizeOcrDate(t);
-
-  const nums = Array.from(t.matchAll(/([0-9][0-9,]*\.?[0-9]*)/g))
-    .map((m) => parseOcrNumber(m[1]))
-    .filter((n) => typeof n === "number" && Number.isFinite(n));
-  const maxNum = nums.length ? Math.max(...nums) : null;
-
-  return {
-    amount: typeof amount === "number" && amount > 0 ? amount : null,
-    share: typeof share === "number" && share > 0 ? share : null,
-    price: typeof price === "number" && price > 0 ? price : null,
-    date,
-    fallbackMax: typeof maxNum === "number" && maxNum > 0 ? maxNum : null,
-  };
-}
-
-function TradeModal({ type, fund, onClose, onConfirm }) {
-  const isBuy = type === "buy";
-  const [share, setShare] = useState("");
-  const [amount, setAmount] = useState("");
-  const [feeRate, setFeeRate] = useState("0");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [isAfter3pm, setIsAfter3pm] = useState(new Date().getHours() >= 15);
-  const [calcShare, setCalcShare] = useState(null);
-  const fileInputRef = useRef(null);
-  const [ocrStatus, setOcrStatus] = useState("idle");
-  const [ocrProgress, setOcrProgress] = useState(0);
-  const [ocrText, setOcrText] = useState("");
-  const [ocrError, setOcrError] = useState("");
-  const [ocrFields, setOcrFields] = useState(null);
-  const [ocrShowText, setOcrShowText] = useState(false);
-  const price =
-    fund?.estPricedCoverage > 0.05
-      ? fund?.estGsz
-      : typeof fund?.gsz === "number"
-        ? fund?.gsz
-        : Number(fund?.dwjz);
-
-  useEffect(() => {
-    if (!isBuy) return;
-    const a = parseFloat(amount);
-    const f = parseFloat(feeRate);
-    const p = parseFloat(price);
-    if (a > 0 && p > 0 && !isNaN(f)) {
-      const netAmount = a / (1 + f / 100);
-      const s = netAmount / p;
-      setCalcShare(s);
-    } else {
-      setCalcShare(null);
-    }
-  }, [isBuy, amount, feeRate, price]);
-
-  const handlePickImage = async (file) => {
-    if (!file) return;
-    setOcrError("");
-    setOcrText("");
-    setOcrFields(null);
-    setOcrShowText(false);
-    setOcrStatus("loading");
-    setOcrProgress(0);
-    try {
-      const text = await recognizeImage(file, {
-        lang: "chi_sim+eng",
-        onProgress: (m) => {
-          if (m?.status) setOcrStatus(String(m.status));
-          if (typeof m?.progress === "number") setOcrProgress(m.progress);
-        },
-      });
-      setOcrText(text);
-      setOcrFields(extractTradeFieldsFromOcr(text));
-      setOcrStatus("done");
-    } catch (e) {
-      setOcrStatus("error");
-      setOcrError(e?.message ? String(e.message) : "识别失败");
-    }
-  };
-
-  const applyOcrToForm = () => {
-    const fields = ocrFields;
-    if (!fields) return;
-    if (fields.date) setDate(fields.date);
-    if (isBuy) {
-      const nextAmount =
-        fields.amount ??
-        (fields.fallbackMax && fields.fallbackMax >= 10
-          ? fields.fallbackMax
-          : null);
-      if (nextAmount != null) setAmount(String(nextAmount));
-    } else {
-      const nextShare =
-        fields.share ??
-        (fields.fallbackMax && fields.fallbackMax < 1000000
-          ? fields.fallbackMax
-          : null);
-      if (nextShare != null) setShare(String(nextShare));
-    }
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (isBuy) {
-      if (!amount || !feeRate || !date || calcShare === null || !price) return;
-      onConfirm({
-        share: calcShare,
-        price: Number(price),
-        totalCost: Number(amount),
-        date,
-        isAfter3pm,
-      });
-    } else {
-      if (!share || !price) return;
-      onConfirm({ share: Number(share), price: Number(price) });
-    }
-  };
-
-  const isValid = isBuy
-    ? !!amount && !!feeRate && !!date && calcShare !== null
-    : !!share && !!price;
-
-  return (
-    <motion.div
-      className="modal-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-label={isBuy ? "加仓" : "减仓"}
-      onClick={onClose}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="glass card modal"
-        onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: "420px" }}
-      >
-        <div
-          className="title"
-          style={{ marginBottom: 20, justifyContent: "space-between" }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: "20px" }}>{isBuy ? "📥" : "📤"}</span>
-            <span>{isBuy ? "加仓" : "减仓"}</span>
-          </div>
-          <button
-            className="icon-button"
-            onClick={onClose}
-            style={{ border: "none", background: "transparent" }}
-          >
-            <CloseIcon width="20" height="20" />
-          </button>
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <div
-            className="fund-name"
-            style={{ fontWeight: 600, fontSize: "16px", marginBottom: 4 }}
-          >
-            {fund?.name}
-          </div>
-          <div className="muted" style={{ fontSize: "12px" }}>
-            #{fund?.code}
-          </div>
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <div className="row" style={{ gap: 10, alignItems: "center" }}>
-            <button
-              type="button"
-              className="button secondary"
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                background: "rgba(255,255,255,0.05)",
-                color: "var(--text)",
-                padding: "10px 12px",
-              }}
-              disabled={
-                ocrStatus === "loading" || ocrStatus === "recognizing text"
-              }
-            >
-              从图片识别
-            </button>
-            <div className="muted" style={{ fontSize: 12, flex: 1 }}>
-              {ocrStatus === "idle"
-                ? "支持截图/交易回单"
-                : ocrStatus === "done"
-                  ? "识别完成"
-                  : ocrStatus === "error"
-                    ? "识别失败"
-                    : `${ocrStatus} ${Math.round((ocrProgress || 0) * 100)}%`}
-            </div>
-          </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            style={{ display: "none" }}
-            onChange={(e) => {
-              const file = e?.target?.files?.[0];
-              e.target.value = "";
-              handlePickImage(file);
-            }}
-          />
-
-          {ocrError ? (
-            <div className="error-text" style={{ marginTop: 10 }}>
-              {ocrError}
-            </div>
-          ) : null}
-
-          {ocrFields &&
-          (ocrFields.amount ||
-            ocrFields.share ||
-            ocrFields.price ||
-            ocrFields.date) ? (
-            <div
-              className="glass"
-              style={{
-                marginTop: 10,
-                padding: "10px 12px",
-                borderRadius: 10,
-                background: "rgba(255,255,255,0.03)",
-              }}
-            >
-              <div className="row" style={{ gap: 10, alignItems: "center" }}>
-                <div className="muted" style={{ fontSize: 12, flex: 1 }}>
-                  {ocrFields.date ? `日期 ${ocrFields.date}` : null}
-                  {ocrFields.amount ? `  金额 ¥${ocrFields.amount}` : null}
-                  {ocrFields.share ? `  份额 ${ocrFields.share}` : null}
-                  {ocrFields.price ? `  单价 ${ocrFields.price}` : null}
-                </div>
-                <button
-                  type="button"
-                  className="button"
-                  onClick={applyOcrToForm}
-                  style={{
-                    padding: "8px 10px",
-                    background: "rgba(34, 211, 238, 0.12)",
-                    border: "1px solid rgba(34, 211, 238, 0.4)",
-                    color: "var(--primary)",
-                  }}
-                >
-                  填入表单
-                </button>
-              </div>
-              {ocrText ? (
-                <div style={{ marginTop: 8 }}>
-                  <button
-                    type="button"
-                    className="link-button"
-                    onClick={() => setOcrShowText((v) => !v)}
-                    style={{
-                      fontSize: 12,
-                      color: "var(--muted)",
-                      textDecoration: "underline",
-                      padding: 0,
-                    }}
-                  >
-                    {ocrShowText ? "收起识别文本" : "展开识别文本"}
-                  </button>
-                  {ocrShowText ? (
-                    <pre
-                      style={{
-                        whiteSpace: "pre-wrap",
-                        marginTop: 8,
-                        fontSize: 12,
-                        lineHeight: 1.5,
-                        opacity: 0.9,
-                      }}
-                    >
-                      {ocrText}
-                    </pre>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          {isBuy ? (
-            <>
-              <div className="form-group" style={{ marginBottom: 16 }}>
-                <label
-                  className="muted"
-                  style={{
-                    display: "block",
-                    marginBottom: 8,
-                    fontSize: "14px",
-                  }}
-                >
-                  加仓金额 (¥) <span style={{ color: "var(--danger)" }}>*</span>
-                </label>
-                <div
-                  style={{
-                    border: !amount
-                      ? "1px solid var(--danger)"
-                      : "1px solid var(--border)",
-                    borderRadius: 12,
-                  }}
-                >
-                  <NumericInput
-                    value={amount}
-                    onChange={setAmount}
-                    step={100}
-                    min={0}
-                    placeholder="请输入加仓金额"
-                  />
-                </div>
-              </div>
-
-              <div className="row" style={{ gap: 12, marginBottom: 16 }}>
-                <div className="form-group" style={{ flex: 1 }}>
-                  <label
-                    className="muted"
-                    style={{
-                      display: "block",
-                      marginBottom: 8,
-                      fontSize: "14px",
-                    }}
-                  >
-                    买入费率 (%){" "}
-                    <span style={{ color: "var(--danger)" }}>*</span>
-                  </label>
-                  <div
-                    style={{
-                      border: !feeRate
-                        ? "1px solid var(--danger)"
-                        : "1px solid var(--border)",
-                      borderRadius: 12,
-                    }}
-                  >
-                    <NumericInput
-                      value={feeRate}
-                      onChange={setFeeRate}
-                      step={0.01}
-                      min={0}
-                      placeholder="0.12"
-                    />
-                  </div>
-                </div>
-                <div className="form-group" style={{ flex: 1 }}>
-                  <label
-                    className="muted"
-                    style={{
-                      display: "block",
-                      marginBottom: 8,
-                      fontSize: "14px",
-                    }}
-                  >
-                    加仓日期 <span style={{ color: "var(--danger)" }}>*</span>
-                  </label>
-                  <DatePicker value={date} onChange={setDate} />
-                </div>
-              </div>
-
-              <div className="form-group" style={{ marginBottom: 12 }}>
-                <label
-                  className="muted"
-                  style={{
-                    display: "block",
-                    marginBottom: 8,
-                    fontSize: "14px",
-                  }}
-                >
-                  交易时段
-                </label>
-                <div
-                  className="row"
-                  style={{
-                    gap: 8,
-                    background: "rgba(0,0,0,0.2)",
-                    borderRadius: "8px",
-                    padding: "4px",
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setIsAfter3pm(false)}
-                    style={{
-                      flex: 1,
-                      border: "none",
-                      background: !isAfter3pm
-                        ? "var(--primary)"
-                        : "transparent",
-                      color: !isAfter3pm ? "#05263b" : "var(--muted)",
-                      borderRadius: "6px",
-                      fontSize: "12px",
-                      cursor: "pointer",
-                      padding: "6px 8px",
-                    }}
-                  >
-                    15:00前
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsAfter3pm(true)}
-                    style={{
-                      flex: 1,
-                      border: "none",
-                      background: isAfter3pm ? "var(--primary)" : "transparent",
-                      color: isAfter3pm ? "#05263b" : "var(--muted)",
-                      borderRadius: "6px",
-                      fontSize: "12px",
-                      cursor: "pointer",
-                      padding: "6px 8px",
-                    }}
-                  >
-                    15:00后
-                  </button>
-                </div>
-                <div
-                  className="muted"
-                  style={{ fontSize: "12px", marginTop: 6 }}
-                >
-                  {isAfter3pm ? "将在下一个交易日确认份额" : "将在当日确认份额"}
-                </div>
-              </div>
-
-              {price && calcShare !== null && (
-                <div
-                  className="glass"
-                  style={{
-                    padding: "12px",
-                    borderRadius: "8px",
-                    background: "rgba(34, 211, 238, 0.05)",
-                    border: "1px solid rgba(34, 211, 238, 0.2)",
-                    marginBottom: 8,
-                  }}
-                >
-                  <div
-                    className="row"
-                    style={{ justifyContent: "space-between", marginBottom: 4 }}
-                  >
-                    <span className="muted" style={{ fontSize: "12px" }}>
-                      预计确认份额
-                    </span>
-                    <span style={{ fontWeight: 700, color: "var(--primary)" }}>
-                      {calcShare.toFixed(2)} 份
-                    </span>
-                  </div>
-                  <div className="muted" style={{ fontSize: "12px" }}>
-                    计算基于当前净值/估值：¥{Number(price).toFixed(4)}
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <div className="form-group" style={{ marginBottom: 16 }}>
-                <label
-                  className="muted"
-                  style={{
-                    display: "block",
-                    marginBottom: 8,
-                    fontSize: "14px",
-                  }}
-                >
-                  卖出份额 <span style={{ color: "var(--danger)" }}>*</span>
-                </label>
-                <div
-                  style={{
-                    border: !share
-                      ? "1px solid var(--danger)"
-                      : "1px solid var(--border)",
-                    borderRadius: 12,
-                  }}
-                >
-                  <NumericInput
-                    value={share}
-                    onChange={setShare}
-                    step={1}
-                    min={0}
-                    placeholder="请输入卖出份额"
-                  />
-                </div>
-              </div>
-            </>
-          )}
-
-          <div className="row" style={{ gap: 12, marginTop: 12 }}>
-            <button
-              type="button"
-              className="button secondary"
-              onClick={onClose}
-              style={{
-                flex: 1,
-                background: "rgba(255,255,255,0.05)",
-                color: "var(--text)",
-              }}
-            >
-              取消
-            </button>
-            <button
-              type="submit"
-              className="button"
-              disabled={!isValid}
-              style={{ flex: 1, opacity: isValid ? 1 : 0.6 }}
-            >
-              确定
-            </button>
-          </div>
-        </form>
-      </motion.div>
-    </motion.div>
-  );
-}
-
 function AddResultModal({ failures, onClose }) {
   return (
     <motion.div
@@ -2380,11 +1823,31 @@ export default function HomePage() {
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { fund }
   const [donateOpen, setDonateOpen] = useState(false);
   const [holdings, setHoldings] = useState({}); // { [code]: { share: number, cost?: number, costAmount?: number, profitTotal?: number } }
+  const [historyCache, setHistoryCache] = useState({}); // Cache for fund history (for startDate calculation)
   const [isTradingDay, setIsTradingDay] = useState(true); // 默认为交易日，通过接口校正
   const tabsRef = useRef(null);
 
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+  // Fetch history for funds with startDate
+  useEffect(() => {
+    const codesWithDate = Object.keys(holdings).filter(c => holdings[c]?.startDate);
+    const missing = codesWithDate.filter(c => !historyCache[c]);
+    
+    if (missing.length > 0) {
+      missing.forEach(c => {
+        fetch(`/api/fund/${c}`)
+          .then(r => r.json())
+          .then(data => {
+            if (Array.isArray(data?.history)) {
+              setHistoryCache(prev => ({ ...prev, [c]: data.history }));
+            }
+          })
+          .catch(() => {});
+      });
+    }
+  }, [holdings, historyCache]);
 
   // 检查交易日状态
   const checkTradingDay = () => {
@@ -2554,10 +2017,35 @@ export default function HomePage() {
     const amount = share * currentNav;
 
     let profitTotal = null;
-    if (typeof holding.profitTotal === "number") {
-      profitTotal = holding.profitTotal;
-    } else if (typeof costUnit === "number") {
-      profitTotal = (currentNav - costUnit) * share;
+    const history = historyCache[fund.code];
+    
+    // 优先使用历史数据计算（如果设置了开始日期）
+    if (holding.startDate && history && Array.isArray(history)) {
+      // 查找开始日期对应的净值（或者前一天的净值作为基准）
+      // 逻辑与 FundCardDetailClient 保持一致
+      const startIndex = history.findIndex(h => h.date >= holding.startDate);
+      let baseNav = null;
+      if (startIndex > 0) {
+        baseNav = history[startIndex - 1].nav;
+      }
+      
+      if (baseNav !== null && typeof share === 'number' && Number.isFinite(currentNav)) {
+        const floatingProfit = share * (currentNav - baseNav);
+        const realizedProfit = typeof holding.profitTotal === 'number' ? holding.profitTotal : 0;
+        profitTotal = floatingProfit + realizedProfit;
+      }
+    }
+    
+    // 降级到使用成本价计算
+    if (profitTotal === null) {
+      if (typeof costUnit === "number") {
+        const floatingProfit = (currentNav - costUnit) * share;
+        const realizedProfit =
+          typeof holding.profitTotal === "number" ? holding.profitTotal : 0;
+        profitTotal = floatingProfit + realizedProfit;
+      } else if (typeof holding.profitTotal === "number") {
+        profitTotal = holding.profitTotal;
+      }
     }
 
     const profitRate =
@@ -2748,19 +2236,21 @@ export default function HomePage() {
       share: 0,
       cost: 0,
       costAmount: 0,
-      profitTotal: null,
+      profitTotal: 0,
     };
-    const isBuy = tradeModal.type === "buy";
-
-    let newShare, newCost;
+    // Prefer data.type from TradeModal, fallback to state
+    const tradeType = data.type || tradeModal.type;
+    const isBuy = tradeType === "buy";
 
     if (isBuy) {
-      newShare = current.share + data.share;
+      const newShare = current.share + data.share;
 
-      // 如果传递了 totalCost（即买入总金额），则用它来计算新成本
-      // 否则回退到用 share * price 计算（减仓或旧逻辑）
+      // New TradeModal provides totalCost (including fees)
+      // Fallback for compatibility if needed
       const buyCost =
-        data.totalCost !== undefined ? data.totalCost : data.price * data.share;
+        typeof data.totalCost === "number"
+          ? data.totalCost
+          : data.price * data.share;
 
       const currentCostAmount =
         typeof current.costAmount === "number"
@@ -2768,33 +2258,59 @@ export default function HomePage() {
           : typeof current.cost === "number"
             ? current.cost * current.share
             : 0;
+
       const nextCostAmount = currentCostAmount + buyCost;
 
-      // 加权平均成本 = (原持仓成本 * 原份额 + 本次买入总花费) / 新总份额
-      // 注意：这里默认将手续费也计入成本（如果 totalCost 包含了手续费）
-      newCost = newShare > 0 ? nextCostAmount / newShare : 0;
+      // Weighted Average Cost
+      const newCost = newShare > 0 ? nextCostAmount / newShare : 0;
 
       handleSaveHolding(fund.code, {
         share: newShare,
         cost: newCost,
         costAmount: nextCostAmount,
         profitTotal:
-          typeof current.profitTotal === "number" ? current.profitTotal : null,
+          typeof current.profitTotal === "number" ? current.profitTotal : 0,
       });
     } else {
-      newShare = Math.max(0, current.share - data.share);
-      // 减仓不改变单位成本，只减少份额
-      newCost = current.cost;
-      if (newShare === 0) newCost = 0;
+      // Sell Logic
+      const sellShare = data.share;
+      // redemptionAmount is the net amount received (after fees)
+      // Fallback: estimate using price if not provided (less accurate)
+      const redemptionAmount =
+        typeof data.redemptionAmount === "number"
+          ? data.redemptionAmount
+          : data.share * (data.price || 0); // fallback
 
-      const nextCostAmount = newCost * newShare;
+      if (sellShare <= 0) return;
+
+      const currentCostAmount =
+        typeof current.costAmount === "number"
+          ? current.costAmount
+          : typeof current.cost === "number"
+            ? current.cost * current.share
+            : 0;
+
+      // Calculate proportion of cost basis sold
+      // Prevent division by zero
+      const sellRatio =
+        current.share > 0 ? Math.min(1, sellShare / current.share) : 0;
+      const costOfSoldShares = currentCostAmount * sellRatio;
+
+      // Calculate realized profit for this transaction
+      const realizedProfit = redemptionAmount - costOfSoldShares;
+
+      const nextProfitTotal =
+        (typeof current.profitTotal === "number" ? current.profitTotal : 0) +
+        realizedProfit;
+      const nextCostAmount = currentCostAmount - costOfSoldShares;
+      const nextShare = Math.max(0, current.share - sellShare);
+      const nextCost = nextShare > 0 ? nextCostAmount / nextShare : 0;
 
       handleSaveHolding(fund.code, {
-        share: newShare,
-        cost: newCost,
+        share: nextShare,
+        cost: nextCost,
         costAmount: nextCostAmount,
-        profitTotal:
-          typeof current.profitTotal === "number" ? current.profitTotal : null,
+        profitTotal: nextProfitTotal,
       });
     }
     setTradeModal({ open: false, fund: null, type: "buy" });
@@ -5321,6 +4837,13 @@ export default function HomePage() {
           <TradeModal
             type={tradeModal.type}
             fund={tradeModal.fund}
+            unitPrice={
+              tradeModal.fund?.estPricedCoverage > 0.05
+                ? tradeModal.fund?.estGsz
+                : typeof tradeModal.fund?.gsz === "number"
+                  ? tradeModal.fund?.gsz
+                  : Number(tradeModal.fund?.dwjz)
+            }
             onClose={() =>
               setTradeModal({ open: false, fund: null, type: "buy" })
             }
