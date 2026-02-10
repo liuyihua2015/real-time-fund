@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -9,29 +9,29 @@ import { recognizeImage } from '../../lib/ocrClient';
 import styles from './fund-detail.module.css';
 
 function formatMoneyAbs(n) {
-  if (!Number.isFinite(n)) return '—';
+  if (!Number.isFinite(n)) return "—";
   return n.toFixed(2);
 }
 
 function formatMoneySigned(n) {
-  if (!Number.isFinite(n)) return '—';
-  const sign = n > 0 ? '+' : '';
+  if (!Number.isFinite(n)) return "—";
+  const sign = n > 0 ? "+" : "";
   return `${sign}${n.toFixed(2)}`;
 }
 
 function formatPctSigned(n) {
-  if (!Number.isFinite(n)) return '—';
-  const sign = n > 0 ? '+' : '';
+  if (!Number.isFinite(n)) return "—";
+  const sign = n > 0 ? "+" : "";
   return `${sign}${n.toFixed(2)}%`;
 }
 
 function formatNumber(n, digits = 2) {
-  if (!Number.isFinite(n)) return '—';
+  if (!Number.isFinite(n)) return "—";
   return n.toFixed(digits);
 }
 
 function pickChangeClass(stylesObj, n) {
-  if (!Number.isFinite(n) || n === 0) return '';
+  if (!Number.isFinite(n) || n === 0) return "";
   return n > 0 ? stylesObj.up : stylesObj.down;
 }
 
@@ -469,11 +469,11 @@ export default function MyHoldingPanel({ fund, currentUnit, navUnit }) {
 
   useEffect(() => {
     const onStorage = (e) => {
-      if (e?.key !== 'holdings') return;
+      if (e?.key !== "holdings") return;
       setHolding(normalizeHolding(loadHoldings()?.[code]));
     };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, [code]);
 
   const metrics = useMemo(() => {
@@ -481,19 +481,25 @@ export default function MyHoldingPanel({ fund, currentUnit, navUnit }) {
     const costAmount = holding?.costAmount;
     const profitTotal = holding?.profitTotal;
     const costUnit =
-      typeof share === 'number' && share > 0 && typeof costAmount === 'number'
+      typeof share === "number" && share > 0 && typeof costAmount === "number"
         ? costAmount / share
         : null;
     const value =
-      typeof share === 'number' && Number.isFinite(currentUnit) ? share * currentUnit : null;
+      typeof share === "number" && Number.isFinite(currentUnit)
+        ? share * currentUnit
+        : null;
     const floatProfit =
-      typeof value === 'number' && typeof costAmount === 'number' ? value - costAmount : null;
+      typeof value === "number" && typeof costAmount === "number"
+        ? value - costAmount
+        : null;
     const floatProfitPct =
-      typeof value === 'number' && typeof costAmount === 'number' && costAmount > 0
+      typeof value === "number" &&
+      typeof costAmount === "number" &&
+      costAmount > 0
         ? (value / costAmount - 1) * 100
         : null;
     const todayProfit =
-      typeof share === 'number' &&
+      typeof share === "number" &&
       Number.isFinite(currentUnit) &&
       Number.isFinite(navUnit)
         ? share * (currentUnit - navUnit)
@@ -507,7 +513,7 @@ export default function MyHoldingPanel({ fund, currentUnit, navUnit }) {
       value,
       floatProfit,
       floatProfitPct,
-      todayProfit
+      todayProfit,
     };
   }, [holding, currentUnit, navUnit]);
 
@@ -610,35 +616,52 @@ export default function MyHoldingPanel({ fund, currentUnit, navUnit }) {
 
       {hasHolding ? (
         <>
-          <div className={styles.myHoldHero} style={{ fontFamily: 'var(--font-mono)' }}>
+          <div
+            className={styles.myHoldHero}
+            style={{ fontFamily: "var(--font-mono)" }}
+          >
             <div className={styles.myHoldHeroK}>浮动盈亏</div>
-            <div className={`${styles.myHoldHeroV} ${pickChangeClass(styles, metrics.floatProfit)}`}>
+            <div
+              className={`${styles.myHoldHeroV} ${pickChangeClass(styles, metrics.floatProfit)}`}
+            >
               ¥{formatMoneySigned(metrics.floatProfit)}
               <span style={{ opacity: 0.72, marginLeft: 10, fontSize: 13 }}>
                 ({formatPctSigned(metrics.floatProfitPct)})
               </span>
             </div>
-            <div className={styles.myHoldHeroMeta} style={{ fontFamily: 'var(--font-mono)' }}>
+            <div
+              className={styles.myHoldHeroMeta}
+              style={{ fontFamily: "var(--font-mono)" }}
+            >
               <span>当前市值 ¥{formatMoneyAbs(metrics.value)}</span>
               <span>成本金额 ¥{formatMoneyAbs(metrics.costAmount)}</span>
               <span>份额 {formatNumber(metrics.share, 2)}</span>
             </div>
           </div>
 
-          <div className={styles.myHoldGrid} style={{ fontFamily: 'var(--font-mono)' }}>
+          <div
+            className={styles.myHoldGrid}
+            style={{ fontFamily: "var(--font-mono)" }}
+          >
             <div className={styles.myHoldItem}>
               <div className={styles.myHoldK}>成本单价</div>
-              <div className={styles.myHoldV}>{formatNumber(metrics.costUnit, 4)}</div>
+              <div className={styles.myHoldV}>
+                {formatNumber(metrics.costUnit, 4)}
+              </div>
             </div>
             <div className={styles.myHoldItem}>
               <div className={styles.myHoldK}>当日盈亏</div>
-              <div className={`${styles.myHoldV} ${pickChangeClass(styles, metrics.todayProfit)}`}>
+              <div
+                className={`${styles.myHoldV} ${pickChangeClass(styles, metrics.todayProfit)}`}
+              >
                 ¥{formatMoneySigned(metrics.todayProfit)}
               </div>
             </div>
-            <div className={styles.myHoldItem} style={{ gridColumn: '1 / -1' }}>
+            <div className={styles.myHoldItem} style={{ gridColumn: "1 / -1" }}>
               <div className={styles.myHoldK}>已录入持有收益</div>
-              <div className={`${styles.myHoldV} ${pickChangeClass(styles, metrics.profitTotal)}`}>
+              <div
+                className={`${styles.myHoldV} ${pickChangeClass(styles, metrics.profitTotal)}`}
+              >
                 ¥{formatMoneySigned(metrics.profitTotal)}
               </div>
             </div>

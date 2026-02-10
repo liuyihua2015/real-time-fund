@@ -4571,7 +4571,10 @@ export default function HomePage() {
                                     className="icon-button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setActionModal({ open: true, fund: f });
+                                      setActionModal({
+                                        open: true,
+                                        fund: f,
+                                      });
                                     }}
                                     title="设置持仓"
                                     style={{ width: "28px", height: "28px" }}
@@ -4778,9 +4781,10 @@ export default function HomePage() {
                                             onKeyDown={(e) => {
                                               if (e.key === "Enter") {
                                                 e.stopPropagation();
-                                                setActionModal({
+                                                setTradeModal({
                                                   open: true,
                                                   fund: f,
+                                                  type: "buy",
                                                 });
                                               }
                                             }}

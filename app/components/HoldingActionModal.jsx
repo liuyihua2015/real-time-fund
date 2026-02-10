@@ -127,4 +127,7 @@ export default function HoldingActionModal({ fund, hasHolding, onClose, onAction
     </motion.div>
   );
 }
+<<<<<<< ours
 
+=======
+>>>>>>> theirs
