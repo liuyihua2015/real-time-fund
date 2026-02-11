@@ -3,8 +3,8 @@ import './globals.css';
 import AnalyticsGate from './components/AnalyticsGate';
 
 export const metadata = {
-  title: '基估宝',
-  description: '输入基金编号添加基金，实时显示估值与前10重仓'
+  title: '估值罗盘',
+  description: '实时基金估值与持仓管理，一眼看仓位与重仓股'
 };
 
 export default function RootLayout({ children }) {

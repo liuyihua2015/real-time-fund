@@ -4,12 +4,12 @@ import FundCardDetailClient from './FundCardDetailClient';
 
 export async function generateMetadata({ params }) {
   const code = params?.code;
-  if (!code || !/^\d{6}$/.test(code)) return { title: '基金详情 - 基估宝' };
+  if (!code || !/^\d{6}$/.test(code)) return { title: '基金详情 - 估值罗盘' };
   try {
     const detail = await getFundDetail(code);
     const title = detail?.name
-      ? `${detail.name}（${detail.code}）- 基估宝`
-      : `${code} - 基估宝`;
+      ? `${detail.name}（${detail.code}）- 估值罗盘`
+      : `${code} - 估值罗盘`;
     const desc = detail?.name
       ? `${detail.name}（${detail.code}）基金详情：估值、净值、持仓与重仓信息。`
       : `${code} 基金详情：估值、净值、持仓与重仓信息。`;
@@ -25,7 +25,7 @@ export async function generateMetadata({ params }) {
       }
     };
   } catch {
-    return { title: `${code} - 基估宝` };
+    return { title: `${code} - 估值罗盘` };
   }
 }
 
@@ -34,4 +34,3 @@ export default async function FundDetailPage({ params }) {
   if (!code || !/^\d{6}$/.test(code)) notFound();
   return <FundCardDetailClient code={code} />;
 }
-

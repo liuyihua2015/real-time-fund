@@ -145,6 +145,9 @@ export default function GroupSummary({ funds, holdings, groupName, getProfit }) 
             <span className="label">今日收益</span>
             <span
               className={`value ${summary.totalProfitToday > 0 ? "up" : summary.totalProfitToday < 0 ? "down" : ""}`}
+              data-metric="groupProfitToday"
+              data-testid="group-profit-today"
+              data-value={summary.totalProfitToday}
               style={{ fontFamily: "var(--font-mono)" }}
             >
               <span style={{ marginRight: 1 }}>
@@ -166,6 +169,9 @@ export default function GroupSummary({ funds, holdings, groupName, getProfit }) 
             {summary.hasProfitYesterday ? (
               <span
                 className={`value ${summary.totalProfitYesterday > 0 ? "up" : summary.totalProfitYesterday < 0 ? "down" : ""}`}
+                data-metric="groupProfitYesterday"
+                data-testid="group-profit-yesterday"
+                data-value={summary.totalProfitYesterday}
                 style={{ fontFamily: "var(--font-mono)" }}
               >
                 <span style={{ marginRight: 1 }}>
@@ -189,6 +195,9 @@ export default function GroupSummary({ funds, holdings, groupName, getProfit }) 
             <span className="label">持有收益</span>
             <span
               className={`value ${summary.totalHoldingReturn > 0 ? "up" : summary.totalHoldingReturn < 0 ? "down" : ""}`}
+              data-metric="groupProfitTotal"
+              data-testid="group-profit-total"
+              data-value={summary.totalHoldingReturn}
               style={{ fontFamily: "var(--font-mono)" }}
             >
               <span style={{ marginRight: 1 }}>
@@ -209,6 +218,9 @@ export default function GroupSummary({ funds, holdings, groupName, getProfit }) 
             <span className="label">持有收益率</span>
             <span
               className={`value ${summary.returnRate > 0 ? "up" : summary.returnRate < 0 ? "down" : ""}`}
+              data-metric="groupReturnRate"
+              data-testid="group-return-rate"
+              data-value={summary.returnRate}
               style={{ fontFamily: "var(--font-mono)", cursor: "pointer" }}
               onClick={() => setShowPercent(!showPercent)}
               title="点击切换显示/隐藏百分号"

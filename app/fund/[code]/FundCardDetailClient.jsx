@@ -13,6 +13,7 @@ import {
   saveHoldings,
   normalizeHolding,
 } from "../../lib/holdingsStorage";
+import { calcFundCurrentNav, calcHoldingProfit } from "../../lib/holdingProfit";
 
 function pickUpDownClass(n) {
   if (!Number.isFinite(n) || n === 0) return "";
@@ -214,89 +215,56 @@ export default function FundCardDetailClient({ code }) {
   const navDate = detail?.nav?.navDate;
   const estTime = detail?.nav?.estimateTime;
 
-  // Align currentUnit logic with app/page.jsx
-  // Determine if we should use valuation based on trading time
-  // If it's a trading day, after 9:00, and today's NAV is not yet published (navDate != today), use estimate
   const currentUnit = useMemo(() => {
     const now = new Date();
-    const isAfter9 = now.getHours() >= 9;
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    const hasTodayData = navDate === todayStr;
-
-    // Check if it's a weekend (simple check, backend does better but this is UI fallback)
-    const isWeekend = now.getDay() === 0 || now.getDay() === 6;
-
-    // Default to using NAV if no estimate or if NAV is up-to-date
-    if (!Number.isFinite(estUnit)) return navUnit;
-
-    // If we have today's NAV, use it
-    if (hasTodayData) return navUnit;
-
-    // If it's a weekend, use NAV (markets closed)
-    if (isWeekend) return navUnit;
-
-    // If trading day, after 9am, and no confirmed NAV for today -> Use Estimate
-    if (isAfter9) {
-      return estUnit;
-    }
-
-    // Fallback to NAV
-    return navUnit;
-  }, [navUnit, estUnit, navDate]);
+    const tradingDay = now.getDay() !== 0 && now.getDay() !== 6;
+    const fundForCalc = {
+      code,
+      dwjz: navUnit,
+      gsz: estUnit,
+      gszzl: estChangePct,
+      gztime: estTime,
+      jzrq: navDate,
+    };
+    const r = calcFundCurrentNav({
+      fund: fundForCalc,
+      isTradingDay: tradingDay,
+      now,
+    });
+    if (Number.isFinite(r?.currentNav)) return r.currentNav;
+    if (Number.isFinite(navUnit)) return navUnit;
+    if (Number.isFinite(estUnit)) return estUnit;
+    return null;
+  }, [code, navUnit, estUnit, estChangePct, estTime, navDate]);
 
   const holdingComputed = useMemo(() => {
-    const share = holding?.share;
-    const costAmount =
-      typeof holding?.costAmount === "number"
-        ? holding.costAmount
-        : typeof holding?.cost === "number" && typeof share === "number"
-          ? holding.cost * share
-          : null;
-    const costUnit =
-      typeof share === "number" && share > 0 && typeof costAmount === "number"
-        ? costAmount / share
-        : null;
-    const amount =
-      typeof share === "number" && Number.isFinite(currentUnit)
-        ? share * currentUnit
-        : null;
-    const todayProfit =
-      typeof share === "number" &&
-      Number.isFinite(currentUnit) &&
-      Number.isFinite(navUnit)
-        ? share * (currentUnit - navUnit)
-        : null;
+    const now = new Date();
+    const tradingDay = now.getDay() !== 0 && now.getDay() !== 6;
+    const fundForCalc = {
+      code,
+      dwjz: navUnit,
+      gsz: estUnit,
+      gszzl: estChangePct,
+      gztime: estTime,
+      jzrq: navDate,
+    };
 
-    const floatingProfit =
-      typeof amount === "number" && typeof costAmount === "number"
-        ? amount - costAmount
-        : null;
-    const realizedProfit =
-      typeof holding?.profitTotal === "number" ? holding.profitTotal : 0;
+    const profit = calcHoldingProfit({
+      fund: fundForCalc,
+      holding,
+      history: detail?.history,
+      isTradingDay: tradingDay,
+      now,
+    });
 
-    let holdingProfit = null;
-    if (floatingProfit !== null) {
-      holdingProfit = floatingProfit + realizedProfit;
-    } else if (typeof holding?.profitTotal === "number") {
-      holdingProfit = holding.profitTotal;
-    }
-    const holdingProfitPct =
-      typeof holdingProfit === "number" &&
-      typeof costAmount === "number" &&
-      costAmount > 0
-        ? (holdingProfit / costAmount) * 100
-        : null;
-
-    const hist = Array.isArray(detail?.history) ? detail.history : [];
-    const last = hist.length ? hist[hist.length - 1] : null;
-    const prev = hist.length >= 2 ? hist[hist.length - 2] : null;
-    const yesterdayProfit =
-      typeof share === "number" &&
-      Number.isFinite(last?.nav) &&
-      Number.isFinite(prev?.nav)
-        ? share * (Number(last.nav) - Number(prev.nav))
-        : null;
-
+    const share = profit?.share ?? holding?.share ?? null;
+    const costAmount = profit?.costAmount ?? null;
+    const costUnit = profit?.costUnit ?? null;
+    const amount = profit?.amount ?? null;
+    const todayProfit = profit?.profitToday ?? null;
+    const holdingProfit = profit?.profitTotal ?? null;
+    const holdingProfitPct = profit?.profitRate ?? null;
+    const yesterdayProfit = profit?.profitYesterday ?? null;
     const yesterdayProfitPct =
       typeof yesterdayProfit === "number" &&
       typeof costAmount === "number" &&
@@ -309,16 +277,15 @@ export default function FundCardDetailClient({ code }) {
         return [];
       const list = [];
       const hist = detail.history;
-      const s = share || 0;
-      // Loop from newest to oldest
+      const s = typeof share === "number" ? share : 0;
       for (let i = hist.length - 1; i > 0; i--) {
         const curr = hist[i];
-
-        // Filter out dates before startDate if set
-        if (holding?.startDate && curr.date < holding.startDate) continue;
-
+        if (holding?.startDate && curr?.date < holding.startDate) continue;
         const p = hist[i - 1];
-        const profit = s > 0 ? s * (curr.nav - p.nav) : null;
+        const profit =
+          s > 0 && Number.isFinite(curr?.nav) && Number.isFinite(p?.nav)
+            ? s * (curr.nav - p.nav)
+            : null;
         list.push({
           date: curr.date,
           nav: curr.nav,
@@ -328,56 +295,6 @@ export default function FundCardDetailClient({ code }) {
       }
       return list.slice(0, 30);
     })();
-
-    // Recalculate holdingProfit if startDate is set and history is available
-    if (
-      holding?.startDate &&
-      historyList.length > 0 &&
-      Array.isArray(detail?.history)
-    ) {
-      const hist = detail.history;
-      // Find the history entry for startDate or the day before it
-      // The historyList contains entries where date >= startDate.
-      // The profit of entry T is (NAV_T - NAV_{T-1}).
-      // Sum of profits = NAV_newest - NAV_{start-1}.
-      // So we need the NAV of the day *before* the first entry in our filtered list.
-
-      // Filter logic was: if (curr.date < startDate) continue;
-      // So the oldest entry in historyList is the first one where date >= startDate.
-      // Let's find that entry in the original 'hist' array.
-
-      // hist is sorted by date ascending? Let's check parsePingZhongHistory.
-      // Usually histories are ascending.
-      // If loop was "for (let i = hist.length - 1; i > 0; i--)", it iterates backwards.
-      // historyList.push pushes from newest to oldest? No, loop goes backwards (large index to small).
-      // If hist is ascending (old -> new): i=length-1 is newest. i=0 is oldest.
-      // historyList.push adds newest first. So historyList is New -> Old.
-
-      // We want Sum(Daily Profits).
-      // The oldest relevant daily profit is for the date >= startDate.
-      // Let's find the 'base' NAV, which is the NAV of the day *before* startDate.
-
-      let baseNav = null;
-      // Find index of first record >= startDate
-      const startIndex = hist.findIndex((h) => h.date >= holding.startDate);
-      if (startIndex > 0) {
-        baseNav = hist[startIndex - 1].nav;
-      } else if (startIndex === 0) {
-        // Start date is the very first record? Then base is unknown or we assume cost?
-        // Fallback to cost-based if history insufficient.
-      }
-
-      if (
-        baseNav !== null &&
-        typeof share === "number" &&
-        Number.isFinite(currentUnit)
-      ) {
-        const floatingProfit = share * (currentUnit - baseNav);
-        const realizedProfit =
-          typeof holding.profitTotal === "number" ? holding.profitTotal : 0;
-        holdingProfit = floatingProfit + realizedProfit;
-      }
-    }
 
     return {
       share,
@@ -391,7 +308,16 @@ export default function FundCardDetailClient({ code }) {
       yesterdayProfitPct,
       historyList,
     };
-  }, [holding, currentUnit, navUnit, detail?.history]);
+  }, [
+    code,
+    holding,
+    navUnit,
+    estUnit,
+    estChangePct,
+    estTime,
+    navDate,
+    detail?.history,
+  ]);
 
   const onToggleFavorite = () => {
     const set = readFavorites();
@@ -546,7 +472,7 @@ export default function FundCardDetailClient({ code }) {
             >
               <ArrowLeftIcon width="18" height="18" />
             </button>
-            <span>基估宝</span>
+            <span>估值罗盘</span>
           </div>
           <div className="actions" />
         </div>
@@ -571,7 +497,7 @@ export default function FundCardDetailClient({ code }) {
             >
               <ArrowLeftIcon width="18" height="18" />
             </button>
-            <span>基估宝</span>
+            <span>估值罗盘</span>
           </div>
           <div className="actions" />
         </div>
@@ -614,7 +540,7 @@ export default function FundCardDetailClient({ code }) {
           >
             <ArrowLeftIcon width="18" height="18" />
           </button>
-          <span>基估宝</span>
+          <span>估值罗盘</span>
         </div>
         <div className="actions" />
       </div>
@@ -740,7 +666,7 @@ export default function FundCardDetailClient({ code }) {
                 className={`value ${pickUpDownClass(holdingComputed.yesterdayProfit)}`}
                 style={{ fontFamily: "var(--font-mono)" }}
               >
-                {formatMoneySigned(holdingComputed.yesterdayProfit ?? 0)}
+                {formatMoneySigned(holdingComputed.yesterdayProfit)}
               </span>
             </div>
             <div className="stat" style={{ flexDirection: "column", gap: 4 }}>

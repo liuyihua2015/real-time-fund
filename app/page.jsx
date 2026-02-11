@@ -9,6 +9,7 @@ import ConfirmModal from "./components/ConfirmModal";
 import HoldingActionModal from "./components/HoldingActionModal";
 import TradeModal from "./components/TradeModal";
 import { recognizeImage } from "./lib/ocrClient";
+import { formatYmd, isYmdAfter } from "./lib/dateUtils";
 
 import {
   PlusIcon,
@@ -22,6 +23,8 @@ import {
   FolderPlusIcon,
   MinusIcon,
   StarIcon,
+  SortIcon,
+  SortArrowsIcon,
 } from "./components/Icons";
 import DonateTabs from "./components/DonateTabs";
 import FeedbackModal from "./components/modals/FeedbackModal";
@@ -39,6 +42,16 @@ import { useGroups } from "./hooks/useGroups";
 import { useFundListLogic } from "./hooks/useFundListLogic";
 import { useFundSearch } from "./hooks/useFundSearch";
 import { useSettings } from "./hooks/useSettings";
+
+const sortOptions = [
+  { key: "name", label: "名称" },
+  { key: "code", label: "代码" },
+  { key: "total", label: "持仓总额" },
+  { key: "change", label: "当前涨幅" },
+  { key: "todayProfit", label: "当前收益" },
+  { key: "yesterdayProfit", label: "昨日收益" },
+  { key: "holdingProfit", label: "持有收益" },
+];
 
 export default function HomePage() {
   const router = useRouter();
@@ -120,11 +133,11 @@ export default function HomePage() {
     // Note: useFundListLogic calculates todayStr internally or we pass it?
     // Wait, useFundListLogic used todayStr as prop. We need to pass it.
     // I'll define todayStr here.
-    `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`,
+    formatYmd(new Date()),
     getHoldingProfit,
   );
 
-  const todayStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
+  const todayStr = formatYmd(new Date());
 
   // Modal States
   const [actionModal, setActionModal] = useState({ open: false, fund: null });
@@ -154,6 +167,10 @@ export default function HomePage() {
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef(null);
   const [isAddFundOpen, setIsAddFundOpen] = useState(false);
+  
+  // Sort Dropdown State
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const sortDropdownRef = useRef(null);
 
   // Auto Refresh
   const timerRef = useRef(null);
@@ -174,6 +191,9 @@ export default function HomePage() {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowDropdown(false);
+      }
+      if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target)) {
+        setShowSortDropdown(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -509,10 +529,19 @@ export default function HomePage() {
       <div className="header glass">
         <div className="row" style={{ justifyContent: "space-between" }}>
           <h1 className="title">
-            <span className="logo">📈</span>
-            <span>实时估值</span>
+            <span className="logo">🧭</span>
+            <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <span>估值罗盘</span>
+              <span
+                className="muted"
+                style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.2 }}
+              >
+                实时估值 · 一眼看仓位
+              </span>
+            </span>
           </h1>
           <div className="row">
+            <Announcement />
             <button
               className={`icon-button ${refreshing ? "spin" : ""}`}
               onClick={handleRefresh}
@@ -530,8 +559,6 @@ export default function HomePage() {
             </button>
           </div>
         </div>
-
-        <Announcement />
 
         <div className="search-bar" ref={dropdownRef}>
           <div className="search-input-wrapper">
@@ -774,6 +801,52 @@ export default function HomePage() {
                   onChange={(e) => setLocalSearchTerm(e.target.value)}
                 />
               </div>
+              <div ref={sortDropdownRef} style={{ position: "relative" }}>
+                <button
+                  className={`toggle-btn ${showSortDropdown ? "active" : ""}`}
+                  onClick={() => setShowSortDropdown(!showSortDropdown)}
+                  title="排序"
+                >
+                  <SortIcon width="16" height="16" />
+                </button>
+                <AnimatePresence>
+                  {showSortDropdown && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="search-dropdown glass"
+                      style={{
+                        width: "140px",
+                        right: 0,
+                        left: "auto",
+                        top: "calc(100% + 8px)",
+                      }}
+                    >
+                      {sortOptions.map((opt) => (
+                        <div
+                          key={opt.key}
+                          className={`search-item ${listSort.key === opt.key ? "selected" : ""}`}
+                          onClick={() => {
+                            toggleListSort(opt.key);
+                          }}
+                          style={{ padding: "8px 12px", fontSize: "13px" }}
+                        >
+                          <span>{opt.label}</span>
+                          {listSort.key === opt.key && (
+                            <SortArrowsIcon
+                              width="14"
+                              height="14"
+                              active={true}
+                              dir={listSort.dir}
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
               <div className="view-toggle">
                 <button
                   className={`toggle-btn ${viewMode === "list" ? "active" : ""}`}
@@ -992,11 +1065,16 @@ export default function HomePage() {
             type={tradeModal.type}
             fund={tradeModal.fund}
             unitPrice={
-              tradeModal.fund?.estPricedCoverage > 0.05
-                ? tradeModal.fund?.estGsz
-                : typeof tradeModal.fund?.gsz === "number"
-                  ? tradeModal.fund?.gsz
-                  : Number(tradeModal.fund?.dwjz)
+              (() => {
+                const fund = tradeModal.fund;
+                const useValuation = isYmdAfter(todayStr, fund?.jzrq);
+                if (!useValuation) return Number(fund?.dwjz);
+                return fund?.estPricedCoverage > 0.05
+                  ? fund?.estGsz
+                  : typeof fund?.gsz === "number"
+                    ? fund?.gsz
+                    : Number(fund?.dwjz);
+              })()
             }
             onClose={() =>
               setTradeModal({ open: false, fund: null, type: "buy" })

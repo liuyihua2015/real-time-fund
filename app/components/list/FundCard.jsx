@@ -1,11 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
-import {
-  ExitIcon,
-  StarIcon,
-  SettingsIcon,
-  TrashIcon,
-} from "../Icons";
+import { ExitIcon, StarIcon, SettingsIcon, TrashIcon } from "../Icons";
+import { isYmdAfter } from "../../lib/dateUtils";
 
 function pickUpDownClass(n) {
   if (!Number.isFinite(n) || n === 0) return "";
@@ -70,19 +66,24 @@ export default function FundCard({
   onAction,
 }) {
   const profit = getHoldingProfit(f, holding);
-  
+
   // Data mapping for card view
   const navUnit = Number(f.dwjz);
   const estUnit = f.estPricedCoverage > 0.05 ? f.estGsz : Number(f.gsz);
-  const estChangePct = f.estPricedCoverage > 0.05 ? f.estGszzl : Number(f.gszzl);
+  const estChangePct =
+    f.estPricedCoverage > 0.05 ? f.estGszzl : Number(f.gszzl);
   const estTime = f.gztime;
   const navDate = f.jzrq;
 
   // List view change value logic (kept for list view consistency)
   const now = new Date();
   const isAfter9 = now.getHours() >= 9;
-  const hasTodayData = f.jzrq === todayStr;
-  const useValuationChange = isTradingDay && isAfter9 && !hasTodayData;
+  const hasNavDate = typeof navDate === "string" && navDate.length >= 10;
+  const hasTodayData = hasNavDate && navDate === todayStr;
+  const useValuationByDate = hasNavDate && isYmdAfter(todayStr, navDate);
+  const useValuationChange =
+    useValuationByDate ||
+    (!hasNavDate && isTradingDay && isAfter9 && !hasTodayData);
   const changeValue = useValuationChange
     ? f.estPricedCoverage > 0.05
       ? f.estGszzl
@@ -110,6 +111,7 @@ export default function FundCard({
       <div
         className={viewMode === "card" ? "glass card" : "table-row"}
         data-fund-row="true"
+        data-fund-code={f.code}
         role="link"
         tabIndex={0}
         onClick={(e) => openFundDetail(e, f.code)}
@@ -186,6 +188,9 @@ export default function FundCard({
             <div className="table-cell text-center total-cell">
               {profit ? (
                 <span
+                  data-metric="positionAmount"
+                  data-testid="fund-position-amount"
+                  data-value={profit.amount}
                   style={{
                     fontWeight: 700,
                     fontFamily: "var(--font-mono)",
@@ -203,6 +208,9 @@ export default function FundCard({
                 className={
                   changeValue > 0 ? "up" : changeValue < 0 ? "down" : ""
                 }
+                data-metric="changePct"
+                data-testid="fund-change-pct"
+                data-value={Number.isFinite(changeValue) ? changeValue : ""}
                 style={{
                   fontWeight: 700,
                   fontFamily: "var(--font-mono)",
@@ -222,6 +230,9 @@ export default function FundCard({
                         ? "down"
                         : ""
                   }
+                  data-metric="profitToday"
+                  data-testid="fund-profit-today"
+                  data-value={profit.profitToday}
                   style={{
                     fontWeight: 700,
                     fontFamily: "var(--font-mono)",
@@ -249,6 +260,9 @@ export default function FundCard({
                         ? "down"
                         : ""
                   }
+                  data-metric="profitYesterday"
+                  data-testid="fund-profit-yesterday"
+                  data-value={profit.profitYesterday}
                   style={{
                     fontWeight: 700,
                     fontFamily: "var(--font-mono)",
@@ -284,6 +298,9 @@ export default function FundCard({
                           ? "down"
                           : ""
                     }
+                    data-metric="profitTotal"
+                    data-testid="fund-profit-total"
+                    data-value={profit.profitTotal}
                     style={{
                       fontWeight: 700,
                       fontFamily: "var(--font-mono)",
@@ -305,9 +322,13 @@ export default function FundCard({
                             ? "down muted"
                             : "muted"
                       }
+                      data-metric="profitRate"
+                      data-testid="fund-profit-rate"
+                      data-value={profit.profitRate}
                       style={{ fontSize: 11 }}
                     >
-                      ({profit.profitRate > 0
+                      (
+                      {profit.profitRate > 0
                         ? "+"
                         : profit.profitRate < 0
                           ? "-"
@@ -391,7 +412,9 @@ export default function FundCard({
                   </button>
                 )}
                 <div className="title-text">
-                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span
+                    style={{ display: "flex", alignItems: "center", gap: 6 }}
+                  >
                     {f.name}
                   </span>
                   <span className="muted">#{f.code}</span>
@@ -415,7 +438,7 @@ export default function FundCard({
                   Let's implement it. If in 'all', it might mean remove from list (hide).
                 */}
                 {currentTab !== "all" && currentTab !== "fav" && (
-                   <div className="row" style={{ gap: 4 }}>
+                  <div className="row" style={{ gap: 4 }}>
                     <button
                       className="icon-button danger"
                       title="从分组移除"
@@ -427,7 +450,7 @@ export default function FundCard({
                     >
                       <TrashIcon width="14" height="14" />
                     </button>
-                   </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -454,8 +477,8 @@ export default function FundCard({
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
-                        e.stopPropagation();
-                        onAction("menu", f);
+                      e.stopPropagation();
+                      onAction("menu", f);
                     }
                   }}
                 >
@@ -506,7 +529,10 @@ export default function FundCard({
               </div>
 
               <div className="row" style={{ marginBottom: 14 }}>
-                <div className="stat" style={{ flexDirection: "column", gap: 4 }}>
+                <div
+                  className="stat"
+                  style={{ flexDirection: "column", gap: 4 }}
+                >
                   <span className="label">昨日收益</span>
                   <span
                     className={`value ${pickUpDownClass(profit?.profitYesterday)}`}
@@ -515,7 +541,10 @@ export default function FundCard({
                     {formatMoneySigned(profit?.profitYesterday)}
                   </span>
                 </div>
-                <div className="stat" style={{ flexDirection: "column", gap: 4 }}>
+                <div
+                  className="stat"
+                  style={{ flexDirection: "column", gap: 4 }}
+                >
                   <span className="label">持有收益</span>
                   <span
                     className={`value ${pickUpDownClass(profit?.profitTotal)}`}
@@ -524,7 +553,10 @@ export default function FundCard({
                     {formatMoneySigned(profit?.profitTotal)}
                   </span>
                 </div>
-                <div className="stat" style={{ flexDirection: "column", gap: 4 }}>
+                <div
+                  className="stat"
+                  style={{ flexDirection: "column", gap: 4 }}
+                >
                   <span className="label">持有收益率</span>
                   <span
                     className={`value ${pickUpDownClass(profit?.profitRate)}`}
@@ -536,7 +568,10 @@ export default function FundCard({
               </div>
 
               <div className="row" style={{ marginBottom: 14 }}>
-                <div className="stat" style={{ flexDirection: "column", gap: 4 }}>
+                <div
+                  className="stat"
+                  style={{ flexDirection: "column", gap: 4 }}
+                >
                   <span className="label">持有份额</span>
                   <span
                     className="value"
@@ -545,7 +580,10 @@ export default function FundCard({
                     {formatNumber(profit?.share, 2)}
                   </span>
                 </div>
-                <div className="stat" style={{ flexDirection: "column", gap: 4 }}>
+                <div
+                  className="stat"
+                  style={{ flexDirection: "column", gap: 4 }}
+                >
                   <span className="label">持仓成本价</span>
                   <span
                     className="value"
@@ -554,7 +592,10 @@ export default function FundCard({
                     {formatMoneyAbs(profit?.costAmount)}
                   </span>
                 </div>
-                <div className="stat" style={{ flexDirection: "column", gap: 4 }}>
+                <div
+                  className="stat"
+                  style={{ flexDirection: "column", gap: 4 }}
+                >
                   <span className="label">持仓成本单价</span>
                   <span
                     className="value"

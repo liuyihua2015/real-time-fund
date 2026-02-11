@@ -1,6 +1,6 @@
-# 实时基金估值 (Real-time Fund Valuation)
+# 估值罗盘 (ValuCompass)
 
-一个基于 Next.js 开发的纯前端基金估值与重仓股实时追踪工具。采用玻璃拟态设计（Glassmorphism），支持移动端适配，且无需后端服务器即可运行。
+一个基于 Next.js 开发的纯前端“实时基金估值 + 持仓管理 + 重仓股追踪”工具。采用玻璃拟态设计（Glassmorphism），支持移动端适配，且无需后端服务器即可运行。
 预览地址：[https://hzm0321.github.io/real-time-fund/](https://hzm0321.github.io/real-time-fund/)
 
 ## ✨ 特性
@@ -38,7 +38,16 @@
    npm install
    ```
 
-3. 运行开发服务器：
+3. 配置环境变量（用于“意见反馈”功能）：
+   - 复制示例文件并填入你的 Web3Forms Access Key：
+     ```bash
+     cp .env.local.example .env.local
+     ```
+   - 编辑 `.env.local`：
+     - `NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY=...`
+   - 收件邮箱（例如 `529732278@qq.com`）需要在 Web3Forms 后台配置，不在代码里配置。
+
+4. 运行开发服务器：
    ```bash
    npm run dev
    ```
@@ -53,6 +62,14 @@
 npm run build
 ```
 静态文件将生成在 `out` 目录下。
+
+## 💬 意见反馈（Web3Forms）
+
+本项目的“意见反馈”使用 Web3Forms（前端直连 `https://api.web3forms.com/submit`）提交表单数据。
+
+- Access Key：在环境变量 `NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY` 中配置（见 `.env.local.example`）。
+- 收件邮箱：在 Web3Forms 控制台配置（例如改为 `529732278@qq.com`），需要你登录对应的 Web3Forms 账号后修改。
+- 线上部署：如果部署到 Vercel / 其他平台，需要在平台的环境变量配置中同步设置 `NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY`。
 
 ## 📖 使用说明
 

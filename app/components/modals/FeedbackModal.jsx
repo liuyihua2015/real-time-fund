@@ -18,9 +18,15 @@ export default function FeedbackModal({ onClose }) {
       formData.set("nickname", "匿名");
     }
 
-    // Web3Forms Access Key
-    formData.append("access_key", "c390fbb1-77e0-4aab-a939-caa75edc7319");
-    formData.append("subject", "基估宝 - 用户反馈");
+    const accessKey = process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY;
+    if (!accessKey) {
+      setError("反馈服务未配置，请稍后再试");
+      setSubmitting(false);
+      return;
+    }
+
+    formData.append("access_key", accessKey);
+    formData.append("subject", "估值罗盘 - 用户反馈");
 
     try {
       const response = await fetch("https://api.web3forms.com/submit", {

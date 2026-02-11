@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { isYmdAfter } from "../lib/dateUtils";
 
 export function useFundListLogic(
   funds,
@@ -8,7 +9,7 @@ export function useFundListLogic(
   groups,
   isTradingDay,
   todayStr,
-  getHoldingProfit
+  getHoldingProfit,
 ) {
   // 排序状态
   const [listSort, setListSort] = useState(() => {
@@ -33,21 +34,21 @@ export function useFundListLogic(
 
   // 收起/展开状态
   const [collapsedCodes, setCollapsedCodes] = useState(new Set());
-  
+
   // 本地搜索与添加基金 UI 状态
   const [localSearchTerm, setLocalSearchTerm] = useState("");
 
   const toggleViewMode = useCallback(() => {
     setViewMode((prev) => {
-        const next = prev === "card" ? "list" : "card";
-        localStorage.setItem("viewMode", next);
-        return next;
+      const next = prev === "card" ? "list" : "card";
+      localStorage.setItem("viewMode", next);
+      return next;
     });
   }, []);
-  
+
   useEffect(() => {
-      const saved = localStorage.getItem("viewMode");
-      if (saved) setViewMode(saved);
+    const saved = localStorage.getItem("viewMode");
+    if (saved) setViewMode(saved);
   }, []);
 
   const toggleCollapse = useCallback((code) => {
@@ -112,8 +113,13 @@ export function useFundListLogic(
     for (const f of base) {
       const holding = holdings[f.code];
       const profit = getHoldingProfit(f, holding);
-      const hasTodayData = f.jzrq === todayStr;
-      const useValuationChange = isTradingDay && isAfter9 && !hasTodayData;
+      const navDate = f?.jzrq;
+      const hasNavDate = typeof navDate === "string" && navDate.length >= 10;
+      const hasTodayData = hasNavDate && navDate === todayStr;
+      const useValuationByDate = hasNavDate && isYmdAfter(todayStr, navDate);
+      const useValuationChange =
+        useValuationByDate ||
+        (!hasNavDate && isTradingDay && isAfter9 && !hasTodayData);
       let change = null;
       if (useValuationChange) {
         if (f.estPricedCoverage > 0.05) {
@@ -197,19 +203,26 @@ export function useFundListLogic(
     };
 
     return base.sort(compare);
-  }, [filteredFunds, listSort, holdings, todayStr, isTradingDay, getHoldingProfit]);
+  }, [
+    filteredFunds,
+    listSort,
+    holdings,
+    todayStr,
+    isTradingDay,
+    getHoldingProfit,
+  ]);
 
   return {
-      listSort,
-      toggleListSort,
-      viewMode,
-      toggleViewMode,
-      collapsedCodes,
-      setCollapsedCodes, // Exposed for removeFund logic
-      toggleCollapse,
-      localSearchTerm,
-      setLocalSearchTerm,
-      filteredFunds,
-      listDisplayFunds
+    listSort,
+    toggleListSort,
+    viewMode,
+    toggleViewMode,
+    collapsedCodes,
+    setCollapsedCodes, // Exposed for removeFund logic
+    toggleCollapse,
+    localSearchTerm,
+    setLocalSearchTerm,
+    filteredFunds,
+    listDisplayFunds,
   };
 }
