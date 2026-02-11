@@ -550,7 +550,7 @@ export default function FundCardDetailClient({ code }) {
           </div>
           <div className="actions" />
         </div>
-        <div className="glass card" style={{ padding: 18 }}>
+        <div className="glass card" style={{ padding: 18, marginTop: 100 }}>
           <div className="muted">加载中…</div>
         </div>
       </div>
@@ -575,7 +575,7 @@ export default function FundCardDetailClient({ code }) {
           </div>
           <div className="actions" />
         </div>
-        <div className="glass card" style={{ padding: 18 }}>
+        <div className="glass card" style={{ padding: 18, marginTop: 100 }}>
           <div style={{ fontWeight: 700, marginBottom: 8 }}>加载失败</div>
           <div className="muted" style={{ marginBottom: 14 }}>
             请稍后再试
@@ -618,8 +618,8 @@ export default function FundCardDetailClient({ code }) {
         </div>
         <div className="actions" />
       </div>
-      <div className="glass card" style={{ cursor: "default" }}>
-        <div className="row" style={{ marginBottom: 10 }}>
+      <div className="glass card" style={{ cursor: "default", marginTop: 100 }}>
+        <div className="row" style={{ marginBottom: 20 }}>
           <div className="title">
             <button
               type="button"

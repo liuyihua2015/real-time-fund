@@ -14,14 +14,35 @@
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   height: 100%;
 }
 
 body {
   margin: 0;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-  background: radial-gradient(1200px 600px at 10% -10%, rgba(96,165,250,0.15), transparent 40%) , radial-gradient(1000px 500px at 90% 0%, rgba(34,211,238,0.12), transparent 45%), var(--bg);
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    Helvetica,
+    Arial,
+    "Apple Color Emoji",
+    "Segoe UI Emoji";
+  background:
+    radial-gradient(
+      1200px 600px at 10% -10%,
+      rgba(96, 165, 250, 0.15),
+      transparent 40%
+    ),
+    radial-gradient(
+      1000px 500px at 90% 0%,
+      rgba(34, 211, 238, 0.12),
+      transparent 45%
+    ),
+    var(--bg);
   color: var(--text);
 }
 
@@ -32,10 +53,14 @@ body {
 }
 
 .glass {
-  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.02)
+  );
   border: 1px solid var(--border);
   border-radius: 16px;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
   backdrop-filter: blur(8px);
 }
 
@@ -65,13 +90,25 @@ body {
   gap: 16px;
 }
 
-.col-12 { grid-column: span 12; }
-.col-6 { grid-column: span 6; }
-.col-4 { grid-column: span 4; }
-.col-3 { grid-column: span 3; }
+.col-12 {
+  grid-column: span 12;
+}
+.col-6 {
+  grid-column: span 6;
+}
+.col-4 {
+  grid-column: span 4;
+}
+.col-3 {
+  grid-column: span 3;
+}
 
 @media (max-width: 1024px) {
-  .col-6, .col-4, .col-3 { grid-column: span 12; }
+  .col-6,
+  .col-4,
+  .col-3 {
+    grid-column: span 12;
+  }
 }
 
 .navbar {
@@ -94,12 +131,47 @@ body {
 }
 
 .content {
-  padding-top: 100px;
+  padding-top: 20px;
+}
+
+.header {
+  margin-bottom: 24px;
+  padding: 20px;
+}
+
+.header .title {
+  margin: 0;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header .logo {
+  font-size: 28px;
+}
+
+.search-bar {
+  margin-top: 20px;
+  position: relative;
+}
+
+.search-input {
+  width: 100%;
+  height: 48px !important;
+  padding-left: 40px !important;
+  background: rgba(0, 0, 0, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.search-input:focus {
+  background: rgba(0, 0, 0, 0.4) !important;
+  border-color: var(--primary) !important;
 }
 
 @media (max-width: 640px) {
   .content {
-    padding-top: 90px;
+    padding-top: 80px; /* Increased padding to clear navbar */
   }
   .navbar {
     top: 0;
@@ -109,6 +181,9 @@ body {
     border-top: none;
     border-left: none;
     border-right: none;
+    border-bottom: 1px solid var(--border); /* Ensure boundary */
+    background: rgba(15, 23, 42, 0.85); /* Ensure opacity */
+    backdrop-filter: blur(12px);
   }
   .add-fund-section {
     margin-top: 60px;
@@ -131,11 +206,13 @@ body {
   color: var(--text);
   outline: none;
   font-size: 14px;
-  transition: border-color 200ms ease, box-shadow 200ms ease;
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease;
 }
 .input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(96,165,250,0.2);
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
 }
 
 /* 美化并隐藏原生数字输入的上下按钮，使用自定义按钮 */
@@ -157,11 +234,13 @@ input[type="number"] {
   color: #05263b;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 150ms ease, box-shadow 200ms ease;
+  transition:
+    transform 150ms ease,
+    box-shadow 200ms ease;
 }
 .button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 20px rgba(34,211,238,0.25);
+  box-shadow: 0 10px 20px rgba(34, 211, 238, 0.25);
 }
 .button:active {
   transform: translateY(0);
@@ -272,8 +351,12 @@ input[type="number"] {
     font-size: 14px;
   }
 }
-.up { color: var(--danger); }
-.down { color: var(--success); }
+.up {
+  color: var(--danger);
+}
+.down {
+  color: var(--success);
+}
 
 .list {
   display: grid;
@@ -281,7 +364,9 @@ input[type="number"] {
   gap: 8px;
 }
 @media (max-width: 640px) {
-  .list { grid-template-columns: 1fr; }
+  .list {
+    grid-template-columns: 1fr;
+  }
 }
 
 .item {
@@ -364,7 +449,11 @@ input[type="number"] {
   background: #0b1220;
   color: var(--muted);
   cursor: pointer;
-  transition: box-shadow 200ms ease, border-color 200ms ease, transform 150ms ease, color 200ms ease;
+  transition:
+    box-shadow 200ms ease,
+    border-color 200ms ease,
+    transform 150ms ease,
+    color 200ms ease;
 }
 .icon-button:hover {
   color: var(--text);
@@ -379,7 +468,7 @@ input[type="number"] {
   color: #2b0b0b;
 }
 .icon-button.danger:hover {
-  box-shadow: 0 10px 20px rgba(248,113,113,0.25);
+  box-shadow: 0 10px 20px rgba(248, 113, 113, 0.25);
 }
 
 .fav-button {
@@ -483,8 +572,14 @@ input[type="number"] {
   align-items: center;
 }
 
-.text-right { text-align: right; justify-content: flex-end; }
-.text-center { text-align: center; justify-content: center; }
+.text-right {
+  text-align: right;
+  justify-content: flex-end;
+}
+.text-center {
+  text-align: center;
+  justify-content: center;
+}
 
 .index-cell {
   justify-content: center;
@@ -522,20 +617,33 @@ input[type="number"] {
   }
   .table-row {
     grid-template-columns: 1fr 92px 92px;
-    grid-template-areas: 
+    grid-template-areas:
       "name total change"
       "name today holding"
-      "name . action";
+      "name yesterday action";
     gap: 4px 12px;
     padding: 12px !important;
   }
-  .name-cell { grid-area: name; }
-  .total-cell { grid-area: total; }
-  .change-cell { grid-area: change; }
-  .today-profit-cell { grid-area: today; }
-  .holding-profit-cell { grid-area: holding; }
-  .action-cell { 
-    grid-area: action; 
+  .name-cell {
+    grid-area: name;
+  }
+  .total-cell {
+    grid-area: total;
+  }
+  .change-cell {
+    grid-area: change;
+  }
+  .today-profit-cell {
+    grid-area: today;
+  }
+  .yesterday-profit-cell {
+    grid-area: yesterday;
+  }
+  .holding-profit-cell {
+    grid-area: holding;
+  }
+  .action-cell {
+    grid-area: action;
     justify-content: flex-end;
   }
   .index-cell {
@@ -546,8 +654,12 @@ input[type="number"] {
   }
 }
 
-.stat-compact .up { color: var(--danger); }
-.stat-compact .down { color: var(--success); }
+.stat-compact .up {
+  color: var(--danger);
+}
+.stat-compact .down {
+  color: var(--success);
+}
 
 .filter-bar {
   transition: all 0.3s ease;
@@ -615,7 +727,7 @@ input[type="number"] {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(2,6,23,0.6);
+  background: rgba(2, 6, 23, 0.6);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -643,21 +755,34 @@ input[type="number"] {
   background: #0b1220;
   color: var(--text);
   cursor: pointer;
-  transition: border-color 200ms ease, transform 150ms ease;
+  transition:
+    border-color 200ms ease,
+    transform 150ms ease;
 }
-.chip:hover { transform: translateY(-1px); border-color: var(--accent); }
-.chip.active { background: linear-gradient(180deg, #0ea5e9, #22d3ee); color: #05263b; border-color: transparent; }
+.chip:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+}
+.chip.active {
+  background: linear-gradient(180deg, #0ea5e9, #22d3ee);
+  color: #05263b;
+  border-color: transparent;
+}
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 .spin {
   animation: spin 0.8s linear infinite;
 }
 .icon-button[aria-busy="true"] {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(96,165,250,0.15);
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.15);
   cursor: default;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -679,8 +804,12 @@ input[type="number"] {
 }
 
 @keyframes loading {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 /* 搜索相关样式 */
@@ -892,8 +1021,20 @@ input[type="number"] {
 }
 
 .tabs-scroll-area[data-mask-left="true"][data-mask-right="true"] {
-  mask-image: linear-gradient(to right, transparent, black 40px, black calc(100% - 40px), transparent);
-  -webkit-mask-image: linear-gradient(to right, transparent, black 40px, black calc(100% - 40px), transparent);
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 40px,
+    black calc(100% - 40px),
+    transparent
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 40px,
+    black calc(100% - 40px),
+    transparent
+  );
 }
 
 .tabs-scroll-area[data-mask-left="true"][data-mask-right="false"] {
@@ -902,8 +1043,18 @@ input[type="number"] {
 }
 
 .tabs-scroll-area[data-mask-left="false"][data-mask-right="true"] {
-  mask-image: linear-gradient(to right, black, black calc(100% - 40px), transparent);
-  -webkit-mask-image: linear-gradient(to right, black, black calc(100% - 40px), transparent);
+  mask-image: linear-gradient(
+    to right,
+    black,
+    black calc(100% - 40px),
+    transparent
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    black,
+    black calc(100% - 40px),
+    transparent
+  );
 }
 
 .tabs {
@@ -1003,7 +1154,7 @@ input[type="number"] {
 .add-group-row-btn:hover {
   border-color: var(--primary) !important;
   color: var(--primary) !important;
-  background: rgba(255,255,255,0.05) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
 }
 
 .tabs-nav-btn {
@@ -1039,7 +1190,9 @@ input[type="number"] {
 
 .group-selector-popup {
   background: rgba(15, 23, 42, 0.95) !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.3),
+    0 8px 10px -6px rgba(0, 0, 0, 0.3);
 }
 
 @media (max-width: 768px) {
@@ -1047,8 +1200,150 @@ input[type="number"] {
     width: 100%;
     margin-bottom: 8px;
   }
-  
+
   .tabs {
     max-width: none !important;
+  }
+}
+
+/* Toolbar Styles */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.toolbar .left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.toolbar .right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.stat-item .value {
+  color: var(--text);
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+.stat-item .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.stat-item .dot.online {
+  background: var(--success);
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
+}
+
+.stat-item .dot.offline {
+  background: var(--muted);
+}
+
+.search-local {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 10px;
+  height: 36px;
+  width: 240px;
+  transition: all 0.2s ease;
+  color: var(--muted);
+}
+
+.search-local:focus-within {
+  border-color: var(--primary);
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--primary);
+}
+
+.search-local input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 13px;
+  width: 100%;
+  margin-left: 6px;
+}
+
+.search-local input::placeholder {
+  color: rgba(156, 163, 175, 0.5);
+}
+
+.view-toggle {
+  display: flex;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 2px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.toggle-btn {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.toggle-btn:hover {
+  color: var(--text);
+}
+
+.toggle-btn.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 640px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .toolbar .left {
+    justify-content: space-between;
+  }
+
+  .toolbar .right {
+    width: 100%;
+  }
+
+  .search-local {
+    flex: 1;
+    width: auto;
   }
 }
