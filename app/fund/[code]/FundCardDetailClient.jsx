@@ -669,7 +669,15 @@ export default function FundCardDetailClient({ code }) {
                 {formatMoneySigned(holdingComputed.yesterdayProfit)}
               </span>
             </div>
-            <div className="stat" style={{ flexDirection: "column", gap: 4 }}>
+            <div
+              className="stat"
+              style={{
+                flexDirection: "column",
+                gap: 4,
+                alignItems: "center",
+                textAlign: "center",
+              }}
+            >
               <span className="label">持有收益</span>
               <span
                 className={`value ${pickUpDownClass(holdingComputed.holdingProfit)}`}
@@ -699,7 +707,15 @@ export default function FundCardDetailClient({ code }) {
                 {formatNumber(holdingComputed.share, 2)}
               </span>
             </div>
-            <div className="stat" style={{ flexDirection: "column", gap: 4 }}>
+            <div
+              className="stat"
+              style={{
+                flexDirection: "column",
+                gap: 4,
+                alignItems: "center",
+                textAlign: "center",
+              }}
+            >
               <span className="label">持仓成本价</span>
               <span
                 className="value"
@@ -752,7 +768,13 @@ export default function FundCardDetailClient({ code }) {
           </div>
           <div
             className="stat"
-            style={{ flexDirection: "column", gap: 4, minWidth: 0 }}
+            style={{
+              flexDirection: "column",
+              gap: 4,
+              minWidth: 0,
+              alignItems: "center",
+              textAlign: "center",
+            }}
           >
             <span
               className="label"
