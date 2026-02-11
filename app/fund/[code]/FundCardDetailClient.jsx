@@ -213,7 +213,36 @@ export default function FundCardDetailClient({ code }) {
   const estChangePct = detail?.nav?.estimateChangePct;
   const navDate = detail?.nav?.navDate;
   const estTime = detail?.nav?.estimateTime;
-  const currentUnit = Number.isFinite(estUnit) ? estUnit : navUnit;
+
+  // Align currentUnit logic with app/page.jsx
+  // Determine if we should use valuation based on trading time
+  // If it's a trading day, after 9:00, and today's NAV is not yet published (navDate != today), use estimate
+  const currentUnit = useMemo(() => {
+    const now = new Date();
+    const isAfter9 = now.getHours() >= 9;
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const hasTodayData = navDate === todayStr;
+
+    // Check if it's a weekend (simple check, backend does better but this is UI fallback)
+    const isWeekend = now.getDay() === 0 || now.getDay() === 6;
+
+    // Default to using NAV if no estimate or if NAV is up-to-date
+    if (!Number.isFinite(estUnit)) return navUnit;
+
+    // If we have today's NAV, use it
+    if (hasTodayData) return navUnit;
+
+    // If it's a weekend, use NAV (markets closed)
+    if (isWeekend) return navUnit;
+
+    // If trading day, after 9am, and no confirmed NAV for today -> Use Estimate
+    if (isAfter9) {
+      return estUnit;
+    }
+
+    // Fallback to NAV
+    return navUnit;
+  }, [navUnit, estUnit, navDate]);
 
   const holdingComputed = useMemo(() => {
     const share = holding?.share;

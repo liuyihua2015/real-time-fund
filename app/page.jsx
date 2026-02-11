@@ -1759,14 +1759,19 @@ export default function HomePage() {
   const refreshingRef = useRef(false);
 
   const openFundDetail = (e, code) => {
-    const target = e?.target;
-    if (target && typeof target.closest === "function") {
-      const row = target.closest('[data-fund-row="true"]');
-      const blocked = target.closest(
-        'button, a, input, textarea, select, [role="button"]',
-      );
-      if (row && blocked && row.contains(blocked) && blocked !== row) return;
-    }
+    // Check if user is selecting text - if so, don't navigate
+    const selection = window.getSelection();
+    if (selection.toString().length > 0) return;
+
+    // We can rely on child elements (like buttons) stopping propagation
+    // or just checking if default was prevented
+    if (e.defaultPrevented) return;
+
+    // Also check if we clicked on an input/button directly just in case propagation wasn't stopped
+    const target = e.target;
+    if (target.closest('button, input, textarea, select, [role="button"]'))
+      return;
+
     router.push(`/fund/${code}`);
   };
 
@@ -1832,16 +1837,18 @@ export default function HomePage() {
 
   // Fetch history for funds with startDate
   useEffect(() => {
-    const codesWithDate = Object.keys(holdings).filter(c => holdings[c]?.startDate);
-    const missing = codesWithDate.filter(c => !historyCache[c]);
-    
+    const codesWithDate = Object.keys(holdings).filter(
+      (c) => holdings[c]?.startDate,
+    );
+    const missing = codesWithDate.filter((c) => !historyCache[c]);
+
     if (missing.length > 0) {
-      missing.forEach(c => {
+      missing.forEach((c) => {
         fetch(`/api/fund/${c}`)
-          .then(r => r.json())
-          .then(data => {
+          .then((r) => r.json())
+          .then((data) => {
             if (Array.isArray(data?.history)) {
-              setHistoryCache(prev => ({ ...prev, [c]: data.history }));
+              setHistoryCache((prev) => ({ ...prev, [c]: data.history }));
             }
           })
           .catch(() => {});
@@ -1851,51 +1858,16 @@ export default function HomePage() {
 
   // 检查交易日状态
   const checkTradingDay = () => {
+    // Simple check: default to true for weekdays (Mon-Fri)
     const now = new Date();
-    const isWeekend = now.getDay() === 0 || now.getDay() === 6;
+    const day = now.getDay();
+    const isWeekday = day !== 0 && day !== 6;
 
-    // 周末直接判定为非交易日
-    if (isWeekend) {
-      setIsTradingDay(false);
-      return;
-    }
-
-    // 工作日通过上证指数判断是否为节假日
-    // 接口返回示例: v_sh000001="1~上证指数~...~20260205150000~..."
-    // 第30位是时间字段
-    const script = document.createElement("script");
-    script.src = `https://qt.gtimg.cn/q=sh000001&_t=${Date.now()}`;
-    script.onload = () => {
-      const data = window.v_sh000001;
-      if (data) {
-        const parts = data.split("~");
-        if (parts.length > 30) {
-          const dateStr = parts[30].slice(0, 8); // 20260205
-          const currentStr = todayStr.replace(/-/g, "");
-
-          if (dateStr === currentStr) {
-            setIsTradingDay(true); // 日期匹配，确认为交易日
-          } else {
-            // 日期不匹配 (显示的是旧数据)
-            // 如果已经过了 09:30 还是旧数据，说明今天休市
-            const minutes = now.getHours() * 60 + now.getMinutes();
-            if (minutes >= 9 * 60 + 30) {
-              setIsTradingDay(false);
-            } else {
-              // 9:30 之前，即使是旧数据，也默认是交易日（盘前）
-              setIsTradingDay(true);
-            }
-          }
-        }
-      }
-      document.body.removeChild(script);
-    };
-    script.onerror = () => {
-      document.body.removeChild(script);
-      // 接口失败，降级为仅判断周末
-      setIsTradingDay(!isWeekend);
-    };
-    document.body.appendChild(script);
+    // Only set to false if it's explicitly a weekend
+    // We remove the strict API check because the external API often returns stale dates
+    // even on valid trading days (e.g. 2026-02-10 Tue returning 2026-02-09),
+    // causing the list page to incorrectly fall back to NAV while detail page uses Estimate.
+    setIsTradingDay(isWeekday);
   };
 
   useEffect(() => {
@@ -1915,19 +1887,9 @@ export default function HomePage() {
     return funds.filter((f) => codes.has(f.code));
   }, [funds, currentTab, favorites, groups]);
 
-  // 过滤和排序后的基金列表
-  const displayFunds = filteredFunds.slice().sort((a, b) => {
-    if (sortBy === "yield") {
-      const valA =
-        typeof a.estGszzl === "number" ? a.estGszzl : Number(a.gszzl) || 0;
-      const valB =
-        typeof b.estGszzl === "number" ? b.estGszzl : Number(b.gszzl) || 0;
-      return valB - valA;
-    }
-    if (sortBy === "name") return a.name.localeCompare(b.name, "zh-CN");
-    if (sortBy === "code") return a.code.localeCompare(b.code);
-    return 0;
-  });
+  // displayFunds was sorted by 'sortBy' which is deprecated.
+  // We will now use listDisplayFunds for both views.
+  // const displayFunds = filteredFunds.slice().sort((a, b) => { ... });
 
   // 自动滚动选中 Tab 到可视区域
   useEffect(() => {
@@ -2018,24 +1980,29 @@ export default function HomePage() {
 
     let profitTotal = null;
     const history = historyCache[fund.code];
-    
+
     // 优先使用历史数据计算（如果设置了开始日期）
     if (holding.startDate && history && Array.isArray(history)) {
       // 查找开始日期对应的净值（或者前一天的净值作为基准）
       // 逻辑与 FundCardDetailClient 保持一致
-      const startIndex = history.findIndex(h => h.date >= holding.startDate);
+      const startIndex = history.findIndex((h) => h.date >= holding.startDate);
       let baseNav = null;
       if (startIndex > 0) {
         baseNav = history[startIndex - 1].nav;
       }
-      
-      if (baseNav !== null && typeof share === 'number' && Number.isFinite(currentNav)) {
+
+      if (
+        baseNav !== null &&
+        typeof share === "number" &&
+        Number.isFinite(currentNav)
+      ) {
         const floatingProfit = share * (currentNav - baseNav);
-        const realizedProfit = typeof holding.profitTotal === 'number' ? holding.profitTotal : 0;
+        const realizedProfit =
+          typeof holding.profitTotal === "number" ? holding.profitTotal : 0;
         profitTotal = floatingProfit + realizedProfit;
       }
     }
-    
+
     // 降级到使用成本价计算
     if (profitTotal === null) {
       if (typeof costUnit === "number") {
@@ -2135,7 +2102,12 @@ export default function HomePage() {
       const profitB = metrics.get(b.code)?.profit ?? null;
       const missingA = !profitA;
       const missingB = !profitB;
-      if (key === "total" || key === "todayProfit" || key === "holdingProfit") {
+      if (
+        key === "total" ||
+        key === "todayProfit" ||
+        key === "yesterdayProfit" ||
+        key === "holdingProfit"
+      ) {
         if (missingA && missingB) return 0;
         if (missingA) return 1;
         if (missingB) return -1;
@@ -2146,22 +2118,26 @@ export default function HomePage() {
           ? (profitA?.amount ?? null)
           : key === "todayProfit"
             ? (profitA?.profitToday ?? null)
-            : key === "holdingProfit"
-              ? (profitA?.profitTotal ?? null)
-              : key === "change"
-                ? (metrics.get(a.code)?.change ?? null)
-                : null;
+            : key === "yesterdayProfit"
+              ? (profitA?.profitYesterday ?? null)
+              : key === "holdingProfit"
+                ? (profitA?.profitTotal ?? null)
+                : key === "change"
+                  ? (metrics.get(a.code)?.change ?? null)
+                  : null;
 
       const bv =
         key === "total"
           ? (profitB?.amount ?? null)
           : key === "todayProfit"
             ? (profitB?.profitToday ?? null)
-            : key === "holdingProfit"
-              ? (profitB?.profitTotal ?? null)
-              : key === "change"
-                ? (metrics.get(b.code)?.change ?? null)
-                : null;
+            : key === "yesterdayProfit"
+              ? (profitB?.profitYesterday ?? null)
+              : key === "holdingProfit"
+                ? (profitB?.profitTotal ?? null)
+                : key === "change"
+                  ? (metrics.get(b.code)?.change ?? null)
+                  : null;
 
       const aMissing = !(typeof av === "number" && Number.isFinite(av));
       const bMissing = !(typeof bv === "number" && Number.isFinite(bv));
@@ -3547,48 +3523,74 @@ export default function HomePage() {
                 }}
               />
 
-              <div
-                className="sort-items"
-                style={{ display: "flex", alignItems: "center", gap: 8 }}
-              >
-                <span
-                  className="muted"
-                  style={{
-                    fontSize: "12px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                  }}
+              {viewMode === "card" && (
+                <div
+                  className="sort-items"
+                  style={{ display: "flex", alignItems: "center", gap: 8 }}
                 >
-                  <SortIcon width="14" height="14" />
-                  排序
-                </span>
-                <div className="chips">
-                  {[
-                    { id: "default", label: "默认" },
-                    { id: "yield", label: "涨跌幅" },
-                    { id: "name", label: "名称" },
-                    { id: "code", label: "代码" },
-                  ].map((s) => (
-                    <button
-                      key={s.id}
-                      className={`chip ${sortBy === s.id ? "active" : ""}`}
-                      onClick={() => setSortBy(s.id)}
-                      style={{
-                        height: "28px",
-                        fontSize: "12px",
-                        padding: "0 10px",
-                      }}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
+                  <span
+                    className="muted"
+                    style={{
+                      fontSize: "12px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <SortIcon width="14" height="14" />
+                    排序
+                  </span>
+                  <select
+                    value={listSort.key}
+                    onChange={(e) => toggleListSort(e.target.value)}
+                    style={{
+                      background: "rgba(255, 255, 255, 0.05)",
+                      border: "1px solid var(--border)",
+                      color: "var(--text)",
+                      borderRadius: "8px",
+                      padding: "4px 8px",
+                      fontSize: "12px",
+                      outline: "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <option value="index">序号</option>
+                    <option value="name">名称</option>
+                    <option value="code">代码</option>
+                    <option value="total">持仓总额</option>
+                    <option value="change">当前涨幅</option>
+                    <option value="todayProfit">当前收益</option>
+                    <option value="yesterdayProfit">昨日收益</option>
+                    <option value="holdingProfit">持有收益</option>
+                  </select>
+                  <button
+                    onClick={() => toggleListSort(listSort.key)}
+                    style={{
+                      background: "rgba(255, 255, 255, 0.05)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "8px",
+                      padding: "4px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "var(--text)",
+                    }}
+                    title={listSort.dir === "asc" ? "升序" : "降序"}
+                  >
+                    <SortArrowsIcon
+                      width="14"
+                      height="14"
+                      active={true}
+                      dir={listSort.dir}
+                    />
+                  </button>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
-          {displayFunds.length === 0 ? (
+          {listDisplayFunds.length === 0 ? (
             <div
               className="glass card empty"
               style={{
@@ -3619,7 +3621,7 @@ export default function HomePage() {
           ) : (
             <>
               <GroupSummary
-                funds={displayFunds}
+                funds={listDisplayFunds}
                 holdings={holdings}
                 groupName={getGroupName()}
                 getProfit={getHoldingProfit}
@@ -3782,6 +3784,21 @@ export default function HomePage() {
                             <button
                               type="button"
                               className="table-sort"
+                              onClick={() => toggleListSort("yesterdayProfit")}
+                            >
+                              昨日收益{" "}
+                              <SortArrowsIcon
+                                width="14"
+                                height="14"
+                                active={listSort.key === "yesterdayProfit"}
+                                dir={listSort.dir}
+                              />
+                            </button>
+                          </div>
+                          <div className="table-cell table-header-cell text-center">
+                            <button
+                              type="button"
+                              className="table-sort"
                               onClick={() => toggleListSort("holdingProfit")}
                             >
                               持有收益{" "}
@@ -3798,10 +3815,7 @@ export default function HomePage() {
                           </div>
                         </div>
                       )}
-                      {(viewMode === "list"
-                        ? listDisplayFunds
-                        : displayFunds
-                      ).map((f, idx) => (
+                      {listDisplayFunds.map((f, idx) => (
                         <motion.div
                           layout="position"
                           key={f.code}
@@ -3982,6 +3996,38 @@ export default function HomePage() {
                                             ¥
                                             {Math.abs(
                                               profit.profitToday,
+                                            ).toFixed(2)}
+                                          </span>
+                                        ) : (
+                                          <span className="muted">—</span>
+                                        )}
+                                      </div>
+
+                                      <div className="table-cell text-center today-profit-cell">
+                                        {profit &&
+                                        typeof profit.profitYesterday ===
+                                          "number" ? (
+                                          <span
+                                            className={
+                                              profit.profitYesterday > 0
+                                                ? "up"
+                                                : profit.profitYesterday < 0
+                                                  ? "down"
+                                                  : ""
+                                            }
+                                            style={{
+                                              fontWeight: 700,
+                                              fontFamily: "var(--font-mono)",
+                                            }}
+                                          >
+                                            {profit.profitYesterday > 0
+                                              ? "+"
+                                              : profit.profitYesterday < 0
+                                                ? "-"
+                                                : ""}
+                                            ¥
+                                            {Math.abs(
+                                              profit.profitYesterday,
                                             ).toFixed(2)}
                                           </span>
                                         ) : (
