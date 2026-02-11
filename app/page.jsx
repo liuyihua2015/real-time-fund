@@ -1772,6 +1772,8 @@ export default function HomePage() {
     if (target.closest('button, input, textarea, select, [role="button"]'))
       return;
 
+    // Set flag to skip refresh when returning
+    sessionStorage.setItem("skip_refresh_on_mount", "true");
     router.push(`/fund/${code}`);
   };
 
@@ -1790,7 +1792,22 @@ export default function HomePage() {
   // 自选状态
   const [favorites, setFavorites] = useState(new Set());
   const [groups, setGroups] = useState([]); // [{ id, name, codes: [] }]
-  const [currentTab, setCurrentTab] = useState("all");
+  const [currentTab, setCurrentTab] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = sessionStorage.getItem("fund_current_tab");
+        return saved || "all";
+      } catch (e) {
+        return "all";
+      }
+    }
+    return "all";
+  });
+
+  // 保存 Tab 状态
+  useEffect(() => {
+    sessionStorage.setItem("fund_current_tab", currentTab);
+  }, [currentTab]);
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [groupManageOpen, setGroupManageOpen] = useState(false);
   const [addFundToGroupOpen, setAddFundToGroupOpen] = useState(false);
@@ -1798,7 +1815,22 @@ export default function HomePage() {
 
   // 排序状态
   const [sortBy, setSortBy] = useState("default"); // default, name, yield, code
-  const [listSort, setListSort] = useState({ key: "index", dir: "asc" });
+  const [listSort, setListSort] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = sessionStorage.getItem("fund_list_sort");
+        return saved ? JSON.parse(saved) : { key: "index", dir: "asc" };
+      } catch (e) {
+        return { key: "index", dir: "asc" };
+      }
+    }
+    return { key: "index", dir: "asc" };
+  });
+
+  // 保存排序状态
+  useEffect(() => {
+    sessionStorage.setItem("fund_list_sort", JSON.stringify(listSort));
+  }, [listSort]);
 
   // 视图模式
   const [viewMode, setViewMode] = useState("card"); // card, list
@@ -1829,6 +1861,7 @@ export default function HomePage() {
   const [donateOpen, setDonateOpen] = useState(false);
   const [holdings, setHoldings] = useState({}); // { [code]: { share: number, cost?: number, costAmount?: number, profitTotal?: number } }
   const [historyCache, setHistoryCache] = useState({}); // Cache for fund history (for startDate calculation)
+  const fetchingHistory = useRef(new Set());
   const [isTradingDay, setIsTradingDay] = useState(true); // 默认为交易日，通过接口校正
   const tabsRef = useRef(null);
 
@@ -1840,10 +1873,13 @@ export default function HomePage() {
     const codesWithDate = Object.keys(holdings).filter(
       (c) => holdings[c]?.startDate,
     );
-    const missing = codesWithDate.filter((c) => !historyCache[c]);
+    const missing = codesWithDate.filter(
+      (c) => !historyCache[c] && !fetchingHistory.current.has(c),
+    );
 
     if (missing.length > 0) {
       missing.forEach((c) => {
+        fetchingHistory.current.add(c);
         fetch(`/api/fund/${c}`)
           .then((r) => r.json())
           .then((data) => {
@@ -1851,7 +1887,10 @@ export default function HomePage() {
               setHistoryCache((prev) => ({ ...prev, [c]: data.history }));
             }
           })
-          .catch(() => {});
+          .catch(() => {})
+          .finally(() => {
+            fetchingHistory.current.delete(c);
+          });
       });
     }
   }, [holdings, historyCache]);
@@ -2468,7 +2507,15 @@ export default function HomePage() {
         setFunds(deduped);
         localStorage.setItem("funds", JSON.stringify(deduped));
         const codes = Array.from(new Set(deduped.map((f) => f.code)));
-        if (codes.length) refreshAll(codes);
+
+        // Check if we should skip the initial refresh (e.g. returning from detail page)
+        const shouldSkip =
+          sessionStorage.getItem("skip_refresh_on_mount") === "true";
+        if (shouldSkip) {
+          sessionStorage.removeItem("skip_refresh_on_mount");
+        } else if (codes.length) {
+          refreshAll(codes);
+        }
       }
       const savedMs = parseInt(
         localStorage.getItem("refreshMs") || "30000",
