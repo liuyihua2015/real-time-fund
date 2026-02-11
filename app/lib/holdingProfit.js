@@ -230,16 +230,28 @@ export function calcHoldingProfit({
   let profitYesterday = null;
   const confirmedNav = toFiniteNumber(fund?.dwjz);
   if (confirmedNav !== null) {
+    // 【修正逻辑】昨日收益对应的涨跌幅仅能使用确权涨跌幅 zzl。
+    // 不能降级使用 gszzl，因为在交易时间内 gszzl 是今日估值，会导致昨日收益等于今日收益。
     const confirmedChangePct =
-      fund?.zzl !== undefined ? Number(fund.zzl) : Number(fund?.gszzl) || 0;
+      fund?.zzl !== undefined ? Number(fund.zzl) : null;
+
     const confirmedAmount = share * confirmedNav;
-    const denom = 1 + confirmedChangePct / 100;
-    const confirmedDailyProfit = denom
-      ? confirmedAmount - confirmedAmount / denom
-      : 0;
 
     if (!base.hasTodayData) {
-      profitYesterday = confirmedDailyProfit;
+      if (confirmedChangePct !== null) {
+        const denom = 1 + confirmedChangePct / 100;
+        profitYesterday = denom ? confirmedAmount - confirmedAmount / denom : 0;
+      } else if (hist && hist.length >= 1) {
+        // 如果 zzl 缺失，尝试从历史记录的第一条（最新的确权记录）获取涨跌幅
+        const latest = hist[hist.length - 1];
+        const latestChangePct = toFiniteNumber(latest?.changePct);
+        if (latestChangePct !== null) {
+          const denom = 1 + latestChangePct / 100;
+          profitYesterday = denom
+            ? confirmedAmount - confirmedAmount / denom
+            : 0;
+        }
+      }
     } else if (hist && hist.length >= 2) {
       const y = hist[hist.length - 2];
       const yNav = toFiniteNumber(y?.nav);
