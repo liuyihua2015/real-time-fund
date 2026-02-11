@@ -172,7 +172,7 @@ export default function FeedbackModal({ onClose }) {
               >
                 如果您有 Github 账号，也可以在本项目
                 <a
-                  href="https://github.com/hzm0321/real-time-fund/issues"
+                  href="https://github.com/liuyihua2015/real-time-fund/issues"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="link-button"
