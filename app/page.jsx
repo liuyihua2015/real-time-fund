@@ -233,6 +233,34 @@ function GridIcon(props) {
   );
 }
 
+function SearchIcon(props) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+    >
+      <circle
+        cx="11"
+        cy="11"
+        r="8"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M21 21l-4.35-4.35"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function CloseIcon(props) {
   return (
     <svg
@@ -1850,6 +1878,10 @@ export default function HomePage() {
   const [addResultOpen, setAddResultOpen] = useState(false);
   const [addFailures, setAddFailures] = useState([]);
   const [holdingModal, setHoldingModal] = useState({ open: false, fund: null });
+
+  // 本地搜索与添加基金 UI 状态
+  const [localSearchTerm, setLocalSearchTerm] = useState("");
+  const [isAddFundOpen, setIsAddFundOpen] = useState(false);
   const [actionModal, setActionModal] = useState({ open: false, fund: null });
   const [tradeModal, setTradeModal] = useState({
     open: false,
@@ -1917,14 +1949,30 @@ export default function HomePage() {
   }, []);
 
   const filteredFunds = useMemo(() => {
-    if (!funds.length) return [];
-    if (currentTab === "all") return funds;
-    if (currentTab === "fav") return funds.filter((f) => favorites.has(f.code));
-    const group = groups.find((g) => g.id === currentTab);
-    if (!group) return [];
-    const codes = new Set(group.codes || []);
-    return funds.filter((f) => codes.has(f.code));
-  }, [funds, currentTab, favorites, groups]);
+    let result = [];
+    if (!funds.length) result = [];
+    else if (currentTab === "all") result = funds;
+    else if (currentTab === "fav")
+      result = funds.filter((f) => favorites.has(f.code));
+    else {
+      const group = groups.find((g) => g.id === currentTab);
+      if (!group) result = [];
+      else {
+        const codes = new Set(group.codes || []);
+        result = funds.filter((f) => codes.has(f.code));
+      }
+    }
+
+    if (localSearchTerm.trim()) {
+      const term = localSearchTerm.trim().toLowerCase();
+      result = result.filter(
+        (f) =>
+          (f.name && f.name.toLowerCase().includes(term)) ||
+          (f.code && f.code.includes(term)),
+      );
+    }
+    return result;
+  }, [funds, currentTab, favorites, groups, localSearchTerm]);
 
   // displayFunds was sorted by 'sortBy' which is deprecated.
   // We will now use listDisplayFunds for both views.
@@ -3292,120 +3340,233 @@ export default function HomePage() {
       </div>
 
       <div className="grid">
-        <div
-          className="col-12 glass card add-fund-section"
-          role="region"
-          aria-label="添加基金"
-        >
-          <div className="title" style={{ marginBottom: 12 }}>
-            <PlusIcon width="20" height="20" />
-            <span>添加基金</span>
-            <span className="muted">搜索并选择基金（支持名称或代码）</span>
-          </div>
-
-          <div className="search-container" ref={dropdownRef}>
-            <form className="form" onSubmit={addFund}>
+        <div className="col-12">
+          <div
+            className="search-action-bar glass"
+            style={{
+              marginBottom: 20,
+              padding: 12,
+              borderRadius: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
+            <div
+              className="local-search-wrapper"
+              style={{
+                flex: 1,
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
               <div
-                className="search-input-wrapper"
                 style={{
-                  flex: 1,
-                  gap: 8,
-                  alignItems: "center",
-                  flexWrap: "wrap",
+                  position: "absolute",
+                  left: 12,
+                  color: "var(--muted)",
+                  pointerEvents: "none",
                 }}
               >
-                {selectedFunds.length > 0 && (
-                  <div className="selected-inline-chips">
-                    {selectedFunds.map((fund) => (
-                      <div key={fund.CODE} className="fund-chip">
-                        <span>{fund.NAME}</span>
-                        <button
-                          onClick={() => toggleSelectFund(fund)}
-                          className="remove-chip"
+                <SearchIcon width="16" height="16" />
+              </div>
+              <input
+                className="local-search-input"
+                placeholder="筛选已添加的基金..."
+                value={localSearchTerm}
+                onChange={(e) => setLocalSearchTerm(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px 10px 36px",
+                  borderRadius: 12,
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-secondary)",
+                  fontSize: 14,
+                  outline: "none",
+                  transition: "all 0.2s",
+                  color: "#fff",
+                }}
+              />
+              {localSearchTerm && (
+                <button
+                  onClick={() => setLocalSearchTerm("")}
+                  style={{
+                    position: "absolute",
+                    right: 12,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--muted)",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  <CloseIcon width="14" height="14" />
+                </button>
+              )}
+            </div>
+
+            <button
+              className={`action-toggle-btn ${isAddFundOpen ? "active" : ""}`}
+              onClick={() => setIsAddFundOpen(!isAddFundOpen)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "10px 16px",
+                borderRadius: 12,
+                background: isAddFundOpen
+                  ? "var(--primary)"
+                  : "var(--bg-secondary)",
+                color: isAddFundOpen ? "#fff" : "var(--foreground)",
+                border: "1px solid var(--border)",
+                fontWeight: 500,
+                cursor: "pointer",
+                transition: "all 0.2s",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <PlusIcon width="16" height="16" />
+              <span>{isAddFundOpen ? "收起" : "添加基金"}</span>
+            </button>
+          </div>
+        </div>
+        <AnimatePresence>
+          {isAddFundOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0, marginBottom: 0 }}
+              animate={{ height: "auto", opacity: 1, marginBottom: 20 }}
+              exit={{ height: 0, opacity: 0, marginBottom: 0 }}
+              style={{ overflow: "hidden" }}
+              className="col-12"
+            >
+              <div
+                className="glass card add-fund-section"
+                role="region"
+                aria-label="添加基金"
+              >
+                <div className="title" style={{ marginBottom: 12 }}>
+                  <PlusIcon width="20" height="20" />
+                  <span>添加基金</span>
+                  <span className="muted">
+                    搜索并选择基金（支持名称或代码）
+                  </span>
+                </div>
+
+                <div className="search-container" ref={dropdownRef}>
+                  <form className="form" onSubmit={addFund}>
+                    <div
+                      className="search-input-wrapper"
+                      style={{
+                        flex: 1,
+                        gap: 8,
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      {selectedFunds.length > 0 && (
+                        <div className="selected-inline-chips">
+                          {selectedFunds.map((fund) => (
+                            <div key={fund.CODE} className="fund-chip">
+                              <span>{fund.NAME}</span>
+                              <button
+                                onClick={() => toggleSelectFund(fund)}
+                                className="remove-chip"
+                              >
+                                <CloseIcon width="14" height="14" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <input
+                        className="input"
+                        placeholder="搜索基金名称或代码..."
+                        value={searchTerm}
+                        onChange={handleSearchInput}
+                        onFocus={() => setShowDropdown(true)}
+                      />
+                      {isSearching && <div className="search-spinner" />}
+                    </div>
+                    <button className="button" type="submit" disabled={loading}>
+                      {loading ? "添加中…" : "添加"}
+                    </button>
+                  </form>
+
+                  <AnimatePresence>
+                    {showDropdown &&
+                      (searchTerm.trim() || searchResults.length > 0) && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="search-dropdown glass"
                         >
-                          <CloseIcon width="14" height="14" />
-                        </button>
-                      </div>
-                    ))}
+                          {searchResults.length > 0 ? (
+                            <div className="search-results">
+                              {searchResults.map((fund) => {
+                                const isSelected = selectedFunds.some(
+                                  (f) => f.CODE === fund.CODE,
+                                );
+                                const isAlreadyAdded = funds.some(
+                                  (f) => f.code === fund.CODE,
+                                );
+                                return (
+                                  <div
+                                    key={fund.CODE}
+                                    className={`search-item ${isSelected ? "selected" : ""} ${isAlreadyAdded ? "added" : ""}`}
+                                    onClick={() => {
+                                      if (isAlreadyAdded) return;
+                                      toggleSelectFund(fund);
+                                    }}
+                                  >
+                                    <div className="fund-info">
+                                      <span className="fund-name">
+                                        {fund.NAME}
+                                      </span>
+                                      <span className="fund-code muted">
+                                        #{fund.CODE} | {fund.TYPE}
+                                      </span>
+                                    </div>
+                                    {isAlreadyAdded ? (
+                                      <span className="added-label">
+                                        已添加
+                                      </span>
+                                    ) : (
+                                      <div className="checkbox">
+                                        {isSelected && (
+                                          <div className="checked-mark" />
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : searchTerm.trim() && !isSearching ? (
+                            <div className="no-results muted">
+                              未找到相关基金
+                            </div>
+                          ) : null}
+                        </motion.div>
+                      )}
+                  </AnimatePresence>
+                </div>
+
+                {error && (
+                  <div
+                    className="muted"
+                    style={{ marginTop: 8, color: "var(--danger)" }}
+                  >
+                    {error}
                   </div>
                 )}
-                <input
-                  className="input"
-                  placeholder="搜索基金名称或代码..."
-                  value={searchTerm}
-                  onChange={handleSearchInput}
-                  onFocus={() => setShowDropdown(true)}
-                />
-                {isSearching && <div className="search-spinner" />}
               </div>
-              <button className="button" type="submit" disabled={loading}>
-                {loading ? "添加中…" : "添加"}
-              </button>
-            </form>
-
-            <AnimatePresence>
-              {showDropdown &&
-                (searchTerm.trim() || searchResults.length > 0) && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="search-dropdown glass"
-                  >
-                    {searchResults.length > 0 ? (
-                      <div className="search-results">
-                        {searchResults.map((fund) => {
-                          const isSelected = selectedFunds.some(
-                            (f) => f.CODE === fund.CODE,
-                          );
-                          const isAlreadyAdded = funds.some(
-                            (f) => f.code === fund.CODE,
-                          );
-                          return (
-                            <div
-                              key={fund.CODE}
-                              className={`search-item ${isSelected ? "selected" : ""} ${isAlreadyAdded ? "added" : ""}`}
-                              onClick={() => {
-                                if (isAlreadyAdded) return;
-                                toggleSelectFund(fund);
-                              }}
-                            >
-                              <div className="fund-info">
-                                <span className="fund-name">{fund.NAME}</span>
-                                <span className="fund-code muted">
-                                  #{fund.CODE} | {fund.TYPE}
-                                </span>
-                              </div>
-                              {isAlreadyAdded ? (
-                                <span className="added-label">已添加</span>
-                              ) : (
-                                <div className="checkbox">
-                                  {isSelected && (
-                                    <div className="checked-mark" />
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : searchTerm.trim() && !isSearching ? (
-                      <div className="no-results muted">未找到相关基金</div>
-                    ) : null}
-                  </motion.div>
-                )}
-            </AnimatePresence>
-          </div>
-
-          {error && (
-            <div
-              className="muted"
-              style={{ marginTop: 8, color: "var(--danger)" }}
-            >
-              {error}
-            </div>
+            </motion.div>
           )}
-        </div>
+        </AnimatePresence>
 
         <div className="col-12">
           <div
