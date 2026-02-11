@@ -335,17 +335,24 @@ export default function TradeModal({ type, fund, unitPrice, onClose, onConfirm }
 
         <form onSubmit={handleSubmit}>
           {/* Mode Switcher */}
-          <div className="tabs glass" style={{ padding: 4, borderRadius: 8, marginBottom: 16, display: 'flex' }}>
+          <div style={{ 
+            padding: 4, 
+            borderRadius: 10, 
+            marginBottom: 20, 
+            display: 'flex',
+            background: 'rgba(0,0,0,0.2)',
+            border: '1px solid rgba(255,255,255,0.05)'
+          }}>
             <button
               type="button"
               onClick={() => setMode('amount')}
               style={{
                 flex: 1,
-                padding: '6px 0',
+                padding: '8px 0',
                 border: 'none',
                 background: mode === 'amount' ? 'rgba(255,255,255,0.1)' : 'transparent',
                 color: mode === 'amount' ? 'var(--text)' : 'var(--muted)',
-                borderRadius: 6,
+                borderRadius: 8,
                 cursor: 'pointer',
                 fontSize: 13,
                 fontWeight: 600,
@@ -359,11 +366,11 @@ export default function TradeModal({ type, fund, unitPrice, onClose, onConfirm }
               onClick={() => setMode('share')}
               style={{
                 flex: 1,
-                padding: '6px 0',
+                padding: '8px 0',
                 border: 'none',
                 background: mode === 'share' ? 'rgba(255,255,255,0.1)' : 'transparent',
                 color: mode === 'share' ? 'var(--text)' : 'var(--muted)',
-                borderRadius: 6,
+                borderRadius: 8,
                 cursor: 'pointer',
                 fontSize: 13,
                 fontWeight: 600,

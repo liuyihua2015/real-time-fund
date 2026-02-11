@@ -1052,7 +1052,7 @@ export default function FundCardDetailClient({ code }) {
 
       <AnimatePresence>
         {tradeModal.open ? (
-          <TradeModalLite
+          <TradeModal
             type={tradeModal.type}
             fund={{ code, name: detail?.name || code }}
             unitPrice={currentUnit}
