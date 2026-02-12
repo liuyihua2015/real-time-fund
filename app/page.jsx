@@ -10,6 +10,11 @@ import HoldingActionModal from "./components/HoldingActionModal";
 import TradeModal from "./components/TradeModal";
 import { recognizeImage } from "./lib/ocrClient";
 import { formatYmd, isYmdAfter } from "./lib/dateUtils";
+import {
+  loadTradeRecords,
+  normalizeTradeRecordsMap,
+  saveTradeRecords,
+} from "./lib/tradeRecordsStorage";
 
 import {
   PlusIcon,
@@ -59,6 +64,7 @@ export default function HomePage() {
   // Custom Hooks
   const {
     refreshMs,
+    setRefreshMs,
     settingsOpen,
     setSettingsOpen,
     tempSeconds,
@@ -437,13 +443,14 @@ export default function HomePage() {
 
   const exportLocalData = () => {
     const data = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       funds,
       holdings,
       groups,
       favorites: Array.from(favorites),
       refreshMs,
       viewMode,
+      tradeRecords: normalizeTradeRecordsMap(loadTradeRecords()),
       exportTime: Date.now(),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -480,10 +487,14 @@ export default function HomePage() {
         if (data.holdings && typeof data.holdings === "object") {
           importHoldings(data.holdings);
         }
+        if (data.tradeRecords && typeof data.tradeRecords === "object") {
+          saveTradeRecords(normalizeTradeRecordsMap(data.tradeRecords));
+        }
         if (data.refreshMs != null) {
           const ms = Number(data.refreshMs);
           if (Number.isFinite(ms) && ms >= 5000) {
             setRefreshMs(ms);
+            setTempSeconds(Math.round(ms / 1000));
             localStorage.setItem("refreshMs", String(ms));
           }
         }
@@ -496,7 +507,17 @@ export default function HomePage() {
           setSettingsOpen(false);
         }, 800);
       } catch (err) {
-        setImportMsg("导入失败: 格式错误");
+        const name = err?.name || "";
+        const msg = String(err?.message || "");
+        const hint =
+          name === "QuotaExceededError" || msg.toLowerCase().includes("quota")
+            ? "浏览器存储空间不足"
+            : name === "SyntaxError"
+              ? "JSON 格式错误"
+              : msg
+                ? msg
+                : "未知错误";
+        setImportMsg(`导入失败: ${hint}`);
       }
     };
     reader.readAsText(file);

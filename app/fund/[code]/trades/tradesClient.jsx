@@ -1,11 +1,17 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence } from 'framer-motion';
 import ConfirmModal from '../../../components/ConfirmModal';
-import { loadTradesByCode, removeTradeRecordById } from '../../../lib/tradeRecordsStorage';
+import {
+  loadTradeRecords,
+  loadTradesByCode,
+  normalizeTradeRecord,
+  removeTradeRecordById,
+  saveTradeRecords,
+} from '../../../lib/tradeRecordsStorage';
 
 function formatMoney(n) {
   if (!Number.isFinite(n)) return '—';
@@ -34,6 +40,60 @@ function tradeDateToTs(date) {
   const dd = Number(m[3]);
   if (!Number.isFinite(y) || !Number.isFinite(mm) || !Number.isFinite(dd)) return 0;
   return new Date(y, mm - 1, dd).getTime();
+}
+
+function isPlainObject(v) {
+  return !!v && typeof v === 'object' && !Array.isArray(v);
+}
+
+function todayStr() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
+function DownloadIcon(props) {
+  return (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M12 3v10m0 0l4-4m-4 4l-4-4"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M4 17v3h16v-3"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function UploadIcon(props) {
+  return (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M12 21V11m0 0l4 4m-4-4l-4 4"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M4 7V4h16v3"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 function ArrowLeftIcon(props) {
@@ -92,6 +152,8 @@ export default function TradesClient({ code }) {
   const [loading, setLoading] = useState(true);
   const [records, setRecords] = useState([]);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const importFileRef = useRef(null);
+  const [importMsg, setImportMsg] = useState('');
 
   useEffect(() => {
     setRecords(loadTradesByCode(code));
@@ -147,6 +209,85 @@ export default function TradesClient({ code }) {
     return { buys, sells, total: sorted.length };
   }, [sorted]);
 
+  const exportTrades = () => {
+    const data = {
+      schemaVersion: 1,
+      kind: 'fundTradeRecords',
+      code,
+      fundName: detail?.name || sorted?.[0]?.fundName || null,
+      records: loadTradesByCode(code),
+      exportTime: Date.now(),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fund-${code}-trades-${todayStr()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const inputEl = e.target;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      let wrote = false;
+      try {
+        const raw = ev.target?.result;
+        const data = JSON.parse(typeof raw === 'string' ? raw : '');
+        if (!data || typeof data !== 'object') throw new Error('bad data');
+
+        let imported = null;
+        if (Array.isArray(data.records)) {
+          imported = data.records;
+        } else if (isPlainObject(data.tradeRecords) && Array.isArray(data.tradeRecords?.[code])) {
+          imported = data.tradeRecords[code];
+        }
+
+        if (!Array.isArray(imported)) throw new Error('no records');
+
+        const normalized = imported
+          .map((r) => {
+            const rr = normalizeTradeRecord(r, code);
+            if (!rr) return null;
+            if (!rr.fundName && detail?.name) return { ...rr, fundName: detail.name };
+            return rr;
+          })
+          .filter(Boolean);
+
+        const all = loadTradeRecords();
+        const next = { ...(isPlainObject(all) ? all : {}), [code]: normalized };
+        saveTradeRecords(next);
+        wrote = true;
+        setRecords(loadTradesByCode(code));
+        setImportMsg(`已导入 ${normalized.length} 条记录`);
+        setTimeout(() => setImportMsg(''), 1200);
+      } catch (err) {
+        if (wrote) {
+          setImportMsg('导入完成');
+          setTimeout(() => setImportMsg(''), 1200);
+          return;
+        }
+        const name = err?.name || '';
+        const msg = String(err?.message || '');
+        const hint =
+          name === 'QuotaExceededError' || msg.toLowerCase().includes('quota')
+            ? '浏览器存储空间不足'
+            : name === 'SyntaxError'
+              ? 'JSON 格式错误'
+              : msg
+                ? msg
+                : '格式错误';
+        setImportMsg(`导入失败: ${hint}`);
+        setTimeout(() => setImportMsg(''), 1500);
+      }
+    };
+    reader.readAsText(file);
+    inputEl.value = '';
+  };
+
   return (
     <div className="container content">
       <AnimatePresence>
@@ -180,7 +321,33 @@ export default function TradesClient({ code }) {
           </button>
           <span>交易记录</span>
         </div>
-        <div className="actions" />
+        <div className="actions">
+          <button
+            type="button"
+            className="icon-button"
+            title="导出交易记录"
+            aria-label="导出交易记录"
+            onClick={exportTrades}
+          >
+            <DownloadIcon width="18" height="18" />
+          </button>
+          <button
+            type="button"
+            className="icon-button"
+            title="导入交易记录"
+            aria-label="导入交易记录"
+            onClick={() => importFileRef.current?.click?.()}
+          >
+            <UploadIcon width="18" height="18" />
+          </button>
+          <input
+            ref={importFileRef}
+            type="file"
+            accept="application/json"
+            style={{ display: 'none' }}
+            onChange={handleImportFileChange}
+          />
+        </div>
       </div>
 
       <div className="glass card" style={{ cursor: 'default', marginTop: 100 }}>
@@ -205,6 +372,12 @@ export default function TradesClient({ code }) {
             </strong>
           </div>
         </div>
+
+        {importMsg ? (
+          <div className="muted" style={{ marginBottom: 10 }}>
+            {importMsg}
+          </div>
+        ) : null}
 
         {loading ? (
           <div className="muted">加载中…</div>
