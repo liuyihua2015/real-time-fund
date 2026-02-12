@@ -366,9 +366,9 @@ export default function FundCard({
                 className="icon-button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onAction("edit", f);
+                  onAction("menu", f);
                 }}
-                title="设置持仓"
+                title="持仓操作"
                 style={{ width: "28px", height: "28px" }}
               >
                 <SettingsIcon width="14" height="14" />
