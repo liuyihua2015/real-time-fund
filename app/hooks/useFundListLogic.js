@@ -46,9 +46,15 @@ export function useFundListLogic(
     });
   }, []);
 
+  const setViewModeExplicit = useCallback((mode) => {
+    const next = mode === "list" ? "list" : "card";
+    setViewMode(next);
+    localStorage.setItem("viewMode", next);
+  }, []);
+
   useEffect(() => {
     const saved = localStorage.getItem("viewMode");
-    if (saved) setViewMode(saved);
+    if (saved === "card" || saved === "list") setViewMode(saved);
   }, []);
 
   const toggleCollapse = useCallback((code) => {
@@ -217,6 +223,7 @@ export function useFundListLogic(
     toggleListSort,
     viewMode,
     toggleViewMode,
+    setViewModeExplicit,
     collapsedCodes,
     setCollapsedCodes, // Exposed for removeFund logic
     toggleCollapse,

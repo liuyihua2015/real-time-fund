@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { loadHoldings, saveHoldings } from "../lib/holdingsStorage";
+import { loadHoldings, saveHoldings, normalizeHolding } from "../lib/holdingsStorage";
 import { formatYmd } from "../lib/dateUtils";
 import { calcHoldingProfit } from "../lib/holdingProfit";
 
@@ -58,6 +58,24 @@ export function useHoldings(isTradingDay) {
     });
   }, []);
 
+  const importHoldings = useCallback((rawHoldings) => {
+    const isPlainObject = (v) =>
+      !!v && typeof v === "object" && !Array.isArray(v);
+
+    const next = {};
+    if (isPlainObject(rawHoldings)) {
+      for (const [code, holding] of Object.entries(rawHoldings)) {
+        if (!code) continue;
+        const normalized = normalizeHolding(holding);
+        if (normalized) next[code] = normalized;
+      }
+    }
+
+    setHoldings(next);
+    setHistoryCache({});
+    saveHoldings(next);
+  }, []);
+
   const getHoldingProfit = useCallback((fund, holding) => {
     const history = historyCache?.[fund?.code];
     return calcHoldingProfit({
@@ -72,6 +90,7 @@ export function useHoldings(isTradingDay) {
   return {
     holdings,
     updateHolding,
+    importHoldings,
     getHoldingProfit,
   };
 }

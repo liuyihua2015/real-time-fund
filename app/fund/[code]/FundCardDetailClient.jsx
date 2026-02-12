@@ -606,8 +606,6 @@ export default function FundCardDetailClient({ code }) {
             <Link
               className="badge"
               href={`/fund/${code}/trades`}
-              target="_blank"
-              rel="noopener noreferrer"
               style={{ textDecoration: "none" }}
             >
               交易记录

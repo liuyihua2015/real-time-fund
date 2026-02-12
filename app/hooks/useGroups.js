@@ -45,6 +45,16 @@ export function useGroups() {
     });
   }, [currentTab]);
 
+  const replaceFavorites = useCallback(
+    (codes) => {
+      const next = new Set(Array.isArray(codes) ? codes.filter(Boolean) : []);
+      setFavorites(next);
+      localStorage.setItem("favorites", JSON.stringify(Array.from(next)));
+      if (next.size === 0 && currentTab === "fav") setCurrentTab("all");
+    },
+    [currentTab],
+  );
+
   const addGroup = useCallback((name) => {
     const newGroup = {
       id: `group_${Date.now()}`,
@@ -137,6 +147,7 @@ export function useGroups() {
     currentTab,
     setCurrentTab,
     toggleFavorite,
+    replaceFavorites,
     addGroup,
     removeGroup,
     updateGroups,

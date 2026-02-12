@@ -81,7 +81,7 @@ export default function HomePage() {
     removeFund: removeFundLogic,
   } = useFunds();
 
-  const { holdings, updateHolding, getHoldingProfit } =
+  const { holdings, updateHolding, importHoldings, getHoldingProfit } =
     useHoldings(isTradingDay);
 
   const {
@@ -90,6 +90,7 @@ export default function HomePage() {
     currentTab,
     setCurrentTab,
     toggleFavorite,
+    replaceFavorites,
     addGroup,
     removeGroup,
     updateGroups,
@@ -116,6 +117,7 @@ export default function HomePage() {
     toggleListSort,
     viewMode,
     toggleViewMode,
+    setViewModeExplicit,
     collapsedCodes,
     setCollapsedCodes,
     toggleCollapse,
@@ -435,6 +437,7 @@ export default function HomePage() {
 
   const exportLocalData = () => {
     const data = {
+      schemaVersion: 1,
       funds,
       holdings,
       groups,
@@ -457,58 +460,47 @@ export default function HomePage() {
   const handleImportFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const inputEl = e.target;
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
-        const data = JSON.parse(ev.target.result);
+        const raw = ev.target?.result;
+        const data = JSON.parse(typeof raw === "string" ? raw : "");
+        if (!data || typeof data !== "object") throw new Error("bad data");
         if (Array.isArray(data.funds)) {
           setFunds(data.funds);
           localStorage.setItem("funds", JSON.stringify(data.funds));
-        }
-        if (data.holdings) {
-          // We need to access setHoldings from useHoldings, but useHoldings only exposes updateHolding.
-          // This is a limitation of my hook design. I should expose setHoldings or bulkUpdate.
-          // For now, I'll iterate or... wait, iterating is bad.
-          // I should update useHoldings to expose setHoldings or bulkSet.
-          // Let's assume I will fix useHoldings.js to export setHoldings or importHoldings.
-          // For now, I will use a hack or just update localStorage and reload? No, that's bad UX.
-          // I'll modify useHoldings.js to return setHoldings.
-          // But I can't modify it in this turn easily without another write.
-          // Actually I can just update localStorage and refresh page? No.
-          // I'll update useHoldings.js in next step if needed, or just assume it returns setHoldings.
-          // Wait, I wrote useHoldings.js and it does NOT return setHoldings.
-          // It returns { holdings, updateHolding, getHoldingProfit }.
-          // I should add `importHoldings` to useHoldings.
         }
         if (Array.isArray(data.groups)) {
           updateGroups(data.groups);
         }
         if (Array.isArray(data.favorites)) {
-          // need setFavorites
-          // useGroups returns toggleFavorite, not setFavorites.
-          // I need to update useGroups too.
+          replaceFavorites(data.favorites);
         }
-        if (data.refreshMs) {
-          setRefreshMs(data.refreshMs);
-          localStorage.setItem("refreshMs", data.refreshMs);
+        if (data.holdings && typeof data.holdings === "object") {
+          importHoldings(data.holdings);
+        }
+        if (data.refreshMs != null) {
+          const ms = Number(data.refreshMs);
+          if (Number.isFinite(ms) && ms >= 5000) {
+            setRefreshMs(ms);
+            localStorage.setItem("refreshMs", String(ms));
+          }
+        }
+        if (data.viewMode === "card" || data.viewMode === "list") {
+          setViewModeExplicit(data.viewMode);
         }
         setImportMsg("导入成功");
         setTimeout(() => {
           setImportMsg("");
           setSettingsOpen(false);
-          window.location.reload(); // Simple way to ensure all hooks sync with localStorage if I write to LS
-        }, 1000);
-
-        // Write to LS for the ones I can't set directly
-        if (data.holdings)
-          localStorage.setItem("holdings", JSON.stringify(data.holdings));
-        if (data.favorites)
-          localStorage.setItem("favorites", JSON.stringify(data.favorites));
+        }, 800);
       } catch (err) {
         setImportMsg("导入失败: 格式错误");
       }
     };
     reader.readAsText(file);
+    inputEl.value = "";
   };
 
   // OCR Logic
