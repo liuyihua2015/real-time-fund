@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { getFundDetail } from "../lib/fundClient";
 
 export function useFunds() {
   const [funds, setFunds] = useState([]);
@@ -80,9 +81,8 @@ export function useFunds() {
       scriptGz.onerror = () => {
         window.jsonpgz = originalJsonpgz;
         scriptGz.remove();
-        // 估值接口失败，尝试请求基础信息接口
-        fetch(`/api/fund/${c}`)
-          .then((r) => r.json())
+        // 估值接口失败，尝试请求移动端基础信息接口
+        getFundDetail(c)
           .then((data) => {
             const nav = data.nav || {};
             resolve({

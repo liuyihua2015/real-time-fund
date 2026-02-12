@@ -8,6 +8,7 @@ import HoldingEditModal from "../../components/HoldingEditModal";
 import HoldingActionModal from "../../components/HoldingActionModal";
 import TradeModal from "../../components/TradeModal";
 import ConfirmModal from "../../components/ConfirmModal";
+import { getFundDetail } from "../../lib/fundClient";
 import {
   loadHoldings,
   saveHoldings,
@@ -191,19 +192,16 @@ export default function FundCardDetailClient({ code }) {
     let aborted = false;
     setLoading(true);
     setError("");
-    fetch(`/api/fund/${code}`, { cache: "no-store" })
-      .then(async (r) => {
-        if (!r.ok) throw new Error(String(r.status));
-        return r.json();
-      })
+    getFundDetail(code)
       .then((json) => {
         if (aborted) return;
         setDetail(json);
         setLoading(false);
       })
-      .catch(() => {
+      .catch((err) => {
         if (aborted) return;
-        setError("加载失败");
+        console.error(err);
+        setError("获取数据失败，请重试");
         setLoading(false);
       });
     return () => {
@@ -444,10 +442,14 @@ export default function FundCardDetailClient({ code }) {
           ? payload.redemptionAmount
           : sellShareRaw * (payload.price || 0);
       const redemptionAmount =
-        sellShareRaw > 0 ? redemptionAmountRaw * (sellShare / sellShareRaw) : redemptionAmountRaw;
+        sellShareRaw > 0
+          ? redemptionAmountRaw * (sellShare / sellShareRaw)
+          : redemptionAmountRaw;
 
       const tradePayload =
-        sellShare === sellShareRaw ? payload : { ...payload, share: sellShare, redemptionAmount };
+        sellShare === sellShareRaw
+          ? payload
+          : { ...payload, share: sellShare, redemptionAmount };
       addTradeFromPayload(code, tradePayload, { fundName: detail?.name });
 
       const sellRatio = sellShare / curShare;
@@ -482,7 +484,10 @@ export default function FundCardDetailClient({ code }) {
   if (loading) {
     return (
       <div className="ui-page">
-        <div className="ui-glass ui-panel compact" style={{ cursor: "default" }}>
+        <div
+          className="ui-glass ui-panel compact"
+          style={{ cursor: "default" }}
+        >
           <div className="muted">加载中…</div>
         </div>
       </div>
@@ -497,11 +502,22 @@ export default function FundCardDetailClient({ code }) {
           <div className="muted" style={{ marginBottom: 14 }}>
             请稍后再试
           </div>
-          <div className="row" style={{ gap: 10, justifyContent: "flex-start" }}>
-            <button className="button" type="button" onClick={() => router.refresh()}>
+          <div
+            className="row"
+            style={{ gap: 10, justifyContent: "flex-start" }}
+          >
+            <button
+              className="button"
+              type="button"
+              onClick={() => router.refresh()}
+            >
               重试
             </button>
-            <Link className="button secondary" href="/" style={{ textDecoration: "none" }}>
+            <Link
+              className="button secondary"
+              href="/"
+              style={{ textDecoration: "none" }}
+            >
               返回列表
             </Link>
           </div>
@@ -958,7 +974,11 @@ export default function FundCardDetailClient({ code }) {
           <HoldingActionModal
             fund={{ code, name: detail?.name || code }}
             hasHolding={!!holding}
-            canSell={typeof holding?.share === "number" && Number.isFinite(holding.share) && holding.share > 0}
+            canSell={
+              typeof holding?.share === "number" &&
+              Number.isFinite(holding.share) &&
+              holding.share > 0
+            }
             onClose={() => setActionOpen(false)}
             onAction={(type) => {
               setActionOpen(false);
@@ -980,7 +1000,12 @@ export default function FundCardDetailClient({ code }) {
             type={tradeModal.type}
             fund={{ code, name: detail?.name || code }}
             unitPrice={currentUnit}
-            maxSellShare={typeof holding?.share === "number" && Number.isFinite(holding.share) ? holding.share : null}
+            maxSellShare={
+              typeof holding?.share === "number" &&
+              Number.isFinite(holding.share)
+                ? holding.share
+                : null
+            }
             onClose={() => setTradeModal({ open: false, type: "buy" })}
             onConfirm={(payload) => {
               applyTrade(payload);

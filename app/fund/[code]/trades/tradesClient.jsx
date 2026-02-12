@@ -1,33 +1,34 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { AnimatePresence } from 'framer-motion';
-import ConfirmModal from '../../../components/ConfirmModal';
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { AnimatePresence } from "framer-motion";
+import ConfirmModal from "../../../components/ConfirmModal";
+import { getFundDetail } from "../../../lib/fundClient";
 import {
   loadTradeRecords,
   loadTradesByCode,
   normalizeTradeRecord,
   removeTradeRecordById,
   saveTradeRecords,
-} from '../../../lib/tradeRecordsStorage';
+} from "../../../lib/tradeRecordsStorage";
 
 function formatMoney(n) {
-  if (!Number.isFinite(n)) return '—';
+  if (!Number.isFinite(n)) return "—";
   return `¥${n.toFixed(2)}`;
 }
 
 function formatNumber(n, digits = 2) {
-  if (!Number.isFinite(n)) return '—';
+  if (!Number.isFinite(n)) return "—";
   return n.toFixed(digits);
 }
 
 function formatTime(ms) {
-  if (!Number.isFinite(ms)) return '';
+  if (!Number.isFinite(ms)) return "";
   const d = new Date(ms);
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
   return `${hh}:${mm}`;
 }
 
@@ -38,25 +39,31 @@ function tradeDateToTs(date) {
   const y = Number(m[1]);
   const mm = Number(m[2]);
   const dd = Number(m[3]);
-  if (!Number.isFinite(y) || !Number.isFinite(mm) || !Number.isFinite(dd)) return 0;
+  if (!Number.isFinite(y) || !Number.isFinite(mm) || !Number.isFinite(dd))
+    return 0;
   return new Date(y, mm - 1, dd).getTime();
 }
 
 function isPlainObject(v) {
-  return !!v && typeof v === 'object' && !Array.isArray(v);
+  return !!v && typeof v === "object" && !Array.isArray(v);
 }
 
 function todayStr() {
   const d = new Date();
   const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${dd}`;
 }
 
 function DownloadIcon(props) {
   return (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+    >
       <path
         d="M12 3v10m0 0l4-4m-4 4l-4-4"
         stroke="currentColor"
@@ -77,7 +84,12 @@ function DownloadIcon(props) {
 
 function UploadIcon(props) {
   return (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+    >
       <path
         d="M12 21V11m0 0l4 4m-4-4l-4 4"
         stroke="currentColor"
@@ -123,7 +135,12 @@ function TrashIcon(props) {
       viewBox="0 0 24 24"
       fill="none"
     >
-      <path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path
+        d="M3 6h18"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
       <path
         d="M8 6l1-2h6l1 2"
         stroke="currentColor"
@@ -153,7 +170,7 @@ export default function TradesClient({ code }) {
   const [records, setRecords] = useState([]);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const importFileRef = useRef(null);
-  const [importMsg, setImportMsg] = useState('');
+  const [importMsg, setImportMsg] = useState("");
 
   useEffect(() => {
     setRecords(loadTradesByCode(code));
@@ -161,29 +178,26 @@ export default function TradesClient({ code }) {
 
   useEffect(() => {
     const onStorage = (e) => {
-      if (e?.key !== 'tradeRecords') return;
+      if (e?.key !== "tradeRecords") return;
       setRecords(loadTradesByCode(code));
     };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, [code]);
 
   useEffect(() => {
     let aborted = false;
     setLoading(true);
-    fetch(`/api/fund/${code}`, { cache: 'no-store' })
-      .then(async (r) => {
-        if (!r.ok) throw new Error(String(r.status));
-        return r.json();
-      })
+    getFundDetail(code)
       .then((json) => {
         if (aborted) return;
         setDetail(json);
-        setLoading(false);
       })
-      .catch(() => {
-        if (aborted) return;
-        setLoading(false);
+      .catch((err) => {
+        console.error(err);
+      })
+      .finally(() => {
+        if (!aborted) setLoading(false);
       });
     return () => {
       aborted = true;
@@ -204,23 +218,25 @@ export default function TradesClient({ code }) {
   }, [records]);
 
   const summary = useMemo(() => {
-    const buys = sorted.filter((r) => r?.type === 'buy').length;
-    const sells = sorted.filter((r) => r?.type === 'sell').length;
+    const buys = sorted.filter((r) => r?.type === "buy").length;
+    const sells = sorted.filter((r) => r?.type === "sell").length;
     return { buys, sells, total: sorted.length };
   }, [sorted]);
 
   const exportTrades = () => {
     const data = {
       schemaVersion: 1,
-      kind: 'fundTradeRecords',
+      kind: "fundTradeRecords",
       code,
       fundName: detail?.name || sorted?.[0]?.fundName || null,
       records: loadTradesByCode(code),
       exportTime: Date.now(),
     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = `fund-${code}-trades-${todayStr()}.json`;
     a.click();
@@ -236,23 +252,27 @@ export default function TradesClient({ code }) {
       let wrote = false;
       try {
         const raw = ev.target?.result;
-        const data = JSON.parse(typeof raw === 'string' ? raw : '');
-        if (!data || typeof data !== 'object') throw new Error('bad data');
+        const data = JSON.parse(typeof raw === "string" ? raw : "");
+        if (!data || typeof data !== "object") throw new Error("bad data");
 
         let imported = null;
         if (Array.isArray(data.records)) {
           imported = data.records;
-        } else if (isPlainObject(data.tradeRecords) && Array.isArray(data.tradeRecords?.[code])) {
+        } else if (
+          isPlainObject(data.tradeRecords) &&
+          Array.isArray(data.tradeRecords?.[code])
+        ) {
           imported = data.tradeRecords[code];
         }
 
-        if (!Array.isArray(imported)) throw new Error('no records');
+        if (!Array.isArray(imported)) throw new Error("no records");
 
         const normalized = imported
           .map((r) => {
             const rr = normalizeTradeRecord(r, code);
             if (!rr) return null;
-            if (!rr.fundName && detail?.name) return { ...rr, fundName: detail.name };
+            if (!rr.fundName && detail?.name)
+              return { ...rr, fundName: detail.name };
             return rr;
           })
           .filter(Boolean);
@@ -263,29 +283,29 @@ export default function TradesClient({ code }) {
         wrote = true;
         setRecords(loadTradesByCode(code));
         setImportMsg(`已导入 ${normalized.length} 条记录`);
-        setTimeout(() => setImportMsg(''), 1200);
+        setTimeout(() => setImportMsg(""), 1200);
       } catch (err) {
         if (wrote) {
-          setImportMsg('导入完成');
-          setTimeout(() => setImportMsg(''), 1200);
+          setImportMsg("导入完成");
+          setTimeout(() => setImportMsg(""), 1200);
           return;
         }
-        const name = err?.name || '';
-        const msg = String(err?.message || '');
+        const name = err?.name || "";
+        const msg = String(err?.message || "");
         const hint =
-          name === 'QuotaExceededError' || msg.toLowerCase().includes('quota')
-            ? '浏览器存储空间不足'
-            : name === 'SyntaxError'
-              ? 'JSON 格式错误'
+          name === "QuotaExceededError" || msg.toLowerCase().includes("quota")
+            ? "浏览器存储空间不足"
+            : name === "SyntaxError"
+              ? "JSON 格式错误"
               : msg
                 ? msg
-                : '格式错误';
+                : "格式错误";
         setImportMsg(`导入失败: ${hint}`);
-        setTimeout(() => setImportMsg(''), 1500);
+        setTimeout(() => setImportMsg(""), 1500);
       }
     };
     reader.readAsText(file);
-    inputEl.value = '';
+    inputEl.value = "";
   };
 
   return (
@@ -294,13 +314,14 @@ export default function TradesClient({ code }) {
         {deleteConfirm ? (
           <ConfirmModal
             title="删除交易记录"
-            message={`确认删除 ${deleteConfirm?.type === 'sell' ? '减仓' : '加仓'}（${
-              deleteConfirm?.date || '—'
+            message={`确认删除 ${deleteConfirm?.type === "sell" ? "减仓" : "加仓"}（${
+              deleteConfirm?.date || "—"
             }）这条记录？`}
             confirmText="确定删除"
             onCancel={() => setDeleteConfirm(null)}
             onConfirm={() => {
-              if (deleteConfirm?.id) removeTradeRecordById(code, deleteConfirm.id);
+              if (deleteConfirm?.id)
+                removeTradeRecordById(code, deleteConfirm.id);
               setRecords(loadTradesByCode(code));
               setDeleteConfirm(null);
             }}
@@ -308,9 +329,15 @@ export default function TradesClient({ code }) {
         ) : null}
       </AnimatePresence>
 
-      <div className="ui-glass ui-panel" style={{ cursor: 'default' }}>
-        <div className="row" style={{ marginBottom: 14, alignItems: 'flex-start' }}>
-          <div className="row" style={{ justifyContent: 'flex-start', gap: 12 }}>
+      <div className="ui-glass ui-panel" style={{ cursor: "default" }}>
+        <div
+          className="row"
+          style={{ marginBottom: 14, alignItems: "flex-start" }}
+        >
+          <div
+            className="row"
+            style={{ justifyContent: "flex-start", gap: 12 }}
+          >
             <button
               type="button"
               className="ui-icon-button"
@@ -322,7 +349,7 @@ export default function TradesClient({ code }) {
             </button>
             <div className="title" style={{ margin: 0 }}>
               <div className="title-text">
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   {detail?.name || sorted?.[0]?.fundName || code}
                 </span>
                 <span className="muted">#{code}</span>
@@ -336,7 +363,7 @@ export default function TradesClient({ code }) {
               <strong>
                 {summary.total}
                 <span className="muted" style={{ fontWeight: 500 }}>
-                  {' '}
+                  {" "}
                   (加{summary.buys} / 减{summary.sells})
                 </span>
               </strong>
@@ -363,7 +390,7 @@ export default function TradesClient({ code }) {
               ref={importFileRef}
               type="file"
               accept="application/json"
-              style={{ display: 'none' }}
+              style={{ display: "none" }}
               onChange={handleImportFileChange}
             />
           </div>
@@ -378,15 +405,15 @@ export default function TradesClient({ code }) {
         {loading ? (
           <div className="muted">加载中…</div>
         ) : sorted.length ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {sorted.map((r) => {
-              const isBuy = r?.type === 'buy';
+              const isBuy = r?.type === "buy";
               const amount = Number(r?.amount);
               const share = Number(r?.share);
               const price = Number(r?.price);
               const feeRate = Number(r?.feeRate);
               const createdAt = Number(r?.createdAt);
-              const dateText = r?.date || '—';
+              const dateText = r?.date || "—";
               const canDelete = !!r?.id;
               return (
                 <div
@@ -395,16 +422,20 @@ export default function TradesClient({ code }) {
                   style={{
                     padding: 12,
                     borderRadius: 12,
-                    background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid rgba(255,255,255,0.06)',
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid rgba(255,255,255,0.06)",
                   }}
                 >
                   <div className="row" style={{ marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 16 }}>{isBuy ? '📥' : '📤'}</span>
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 10 }}
+                    >
+                      <span style={{ fontSize: 16 }}>
+                        {isBuy ? "📥" : "📤"}
+                      </span>
+                      <div style={{ display: "flex", flexDirection: "column" }}>
                         <div style={{ fontWeight: 700 }}>
-                          {isBuy ? '加仓' : '减仓'}{' '}
+                          {isBuy ? "加仓" : "减仓"}{" "}
                           <span className="muted" style={{ fontWeight: 500 }}>
                             {dateText}
                           </span>
@@ -414,13 +445,20 @@ export default function TradesClient({ code }) {
                         </div>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontWeight: 800, fontFamily: 'var(--font-mono)' }}>
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 10 }}
+                    >
+                      <div style={{ textAlign: "right" }}>
+                        <div
+                          style={{
+                            fontWeight: 800,
+                            fontFamily: "var(--font-mono)",
+                          }}
+                        >
                           {formatMoney(amount)}
                         </div>
                         <div className="muted" style={{ fontSize: 12 }}>
-                          {isBuy ? '投入' : '到手'}
+                          {isBuy ? "投入" : "到手"}
                         </div>
                       </div>
                       <button
@@ -428,7 +466,11 @@ export default function TradesClient({ code }) {
                         className="icon-button danger"
                         title="删除记录"
                         aria-label="删除记录"
-                        style={{ width: 28, height: 28, opacity: canDelete ? 1 : 0.5 }}
+                        style={{
+                          width: 28,
+                          height: 28,
+                          opacity: canDelete ? 1 : 0.5,
+                        }}
                         disabled={!canDelete}
                         onClick={() => setDeleteConfirm(r)}
                       >
@@ -439,22 +481,26 @@ export default function TradesClient({ code }) {
 
                   <div
                     style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                      display: "grid",
+                      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
                       gap: 10,
                     }}
                   >
-                    <div className="badge-v" style={{ width: '100%' }}>
+                    <div className="badge-v" style={{ width: "100%" }}>
                       <span>份额</span>
                       <strong>{formatNumber(share, 2)}</strong>
                     </div>
-                    <div className="badge-v" style={{ width: '100%' }}>
+                    <div className="badge-v" style={{ width: "100%" }}>
                       <span>净值</span>
                       <strong>{formatNumber(price, 4)}</strong>
                     </div>
-                    <div className="badge-v" style={{ width: '100%' }}>
+                    <div className="badge-v" style={{ width: "100%" }}>
                       <span>费率</span>
-                      <strong>{Number.isFinite(feeRate) ? `${feeRate.toFixed(2)}%` : '—'}</strong>
+                      <strong>
+                        {Number.isFinite(feeRate)
+                          ? `${feeRate.toFixed(2)}%`
+                          : "—"}
+                      </strong>
                     </div>
                   </div>
                 </div>
@@ -467,7 +513,11 @@ export default function TradesClient({ code }) {
             <div className="muted" style={{ marginBottom: 12 }}>
               在基金详情页进行加仓/减仓后，会自动生成记录并按时间倒序展示。
             </div>
-            <Link className="button" href={`/fund/${code}`} style={{ display: 'inline-flex', textDecoration: 'none' }}>
+            <Link
+              className="button"
+              href={`/fund/${code}`}
+              style={{ display: "inline-flex", textDecoration: "none" }}
+            >
               回到基金详情
             </Link>
           </div>
