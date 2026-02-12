@@ -13,6 +13,7 @@ import {
   saveHoldings,
   normalizeHolding,
 } from "../../lib/holdingsStorage";
+import { addTradeFromPayload } from "../../lib/tradeRecordsStorage";
 import { calcFundCurrentNav, calcHoldingProfit } from "../../lib/holdingProfit";
 
 function pickUpDownClass(n) {
@@ -175,6 +176,7 @@ export default function FundCardDetailClient({ code }) {
   const [tradeModal, setTradeModal] = useState({ open: false, type: "buy" });
   const [holding, setHolding] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
 
   useEffect(() => {
     const set = readFavorites();
@@ -359,6 +361,15 @@ export default function FundCardDetailClient({ code }) {
       }
     } catch {}
 
+    try {
+      const raw = localStorage.getItem("tradeRecords") || "{}";
+      const obj = JSON.parse(raw);
+      if (obj && typeof obj === "object") {
+        delete obj[code];
+        localStorage.setItem("tradeRecords", JSON.stringify(obj));
+      }
+    } catch {}
+
     router.push("/");
   };
 
@@ -407,6 +418,8 @@ export default function FundCardDetailClient({ code }) {
 
       if (!(buyShare > 0)) return;
 
+      addTradeFromPayload(code, payload, { fundName: detail?.name });
+
       const newShare = curShare + buyShare;
       const nextCostAmount = curCostAmount + buyCost;
       const newCostUnit = newShare > 0 ? nextCostAmount / newShare : 0;
@@ -419,19 +432,27 @@ export default function FundCardDetailClient({ code }) {
           typeof current.profitTotal === "number" ? current.profitTotal : 0,
       });
     } else {
-      const sellShare = Number(payload.share);
-      const redemptionAmount =
+      const sellShareRaw = Number(payload.share);
+      if (!(sellShareRaw > 0)) return;
+      if (!(curShare > 0)) return;
+      const eps = 1e-6;
+      if (sellShareRaw > curShare + eps) return;
+      const sellShare = Math.min(sellShareRaw, curShare);
+
+      const redemptionAmountRaw =
         typeof payload.redemptionAmount === "number"
           ? payload.redemptionAmount
-          : sellShare * (payload.price || 0);
+          : sellShareRaw * (payload.price || 0);
+      const redemptionAmount =
+        sellShareRaw > 0 ? redemptionAmountRaw * (sellShare / sellShareRaw) : redemptionAmountRaw;
 
-      if (!(sellShare > 0)) return;
+      const tradePayload =
+        sellShare === sellShareRaw ? payload : { ...payload, share: sellShare, redemptionAmount };
+      addTradeFromPayload(code, tradePayload, { fundName: detail?.name });
 
-      // Calculate proportion of cost basis sold
-      const sellRatio = curShare > 0 ? Math.min(1, sellShare / curShare) : 0;
+      const sellRatio = sellShare / curShare;
       const costOfSoldShares = curCostAmount * sellRatio;
 
-      // Calculate realized profit
       const realizedProfit = redemptionAmount - costOfSoldShares;
 
       const nextProfitTotal =
@@ -582,6 +603,15 @@ export default function FundCardDetailClient({ code }) {
               <span>估值时间</span>
               <strong>{estTime || navDate || "—"}</strong>
             </div>
+            <Link
+              className="badge"
+              href={`/fund/${code}/trades`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: "none" }}
+            >
+              交易记录
+            </Link>
             <div className="row" style={{ gap: 4 }}>
               <button
                 className="icon-button danger"
@@ -983,6 +1013,7 @@ export default function FundCardDetailClient({ code }) {
           <HoldingActionModal
             fund={{ code, name: detail?.name || code }}
             hasHolding={!!holding}
+            canSell={typeof holding?.share === "number" && Number.isFinite(holding.share) && holding.share > 0}
             onClose={() => setActionOpen(false)}
             onAction={(type) => {
               setActionOpen(false);
@@ -991,7 +1022,7 @@ export default function FundCardDetailClient({ code }) {
               } else if (type === "edit") {
                 setHoldingModalOpen(true);
               } else if (type === "clear") {
-                clearHolding();
+                setClearConfirmOpen(true);
               }
             }}
           />
@@ -1004,6 +1035,7 @@ export default function FundCardDetailClient({ code }) {
             type={tradeModal.type}
             fund={{ code, name: detail?.name || code }}
             unitPrice={currentUnit}
+            maxSellShare={typeof holding?.share === "number" && Number.isFinite(holding.share) ? holding.share : null}
             onClose={() => setTradeModal({ open: false, type: "buy" })}
             onConfirm={(payload) => {
               applyTrade(payload);
@@ -1020,6 +1052,21 @@ export default function FundCardDetailClient({ code }) {
             holding={holding}
             onClose={() => setHoldingModalOpen(false)}
             onSave={onSaveHolding}
+          />
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {clearConfirmOpen ? (
+          <ConfirmModal
+            title="清空持仓"
+            message={`确定要清空“${detail?.name || code}”的所有持仓记录吗？`}
+            onConfirm={() => {
+              setClearConfirmOpen(false);
+              clearHolding();
+            }}
+            onCancel={() => setClearConfirmOpen(false)}
+            confirmText="确认清空"
           />
         ) : null}
       </AnimatePresence>

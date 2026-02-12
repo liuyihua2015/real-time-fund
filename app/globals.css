@@ -137,6 +137,8 @@ body {
 .header {
   margin-bottom: 24px;
   padding: 20px;
+  position: relative;
+  z-index: 45;
 }
 
 .header .title {
@@ -154,6 +156,7 @@ body {
 .search-bar {
   margin-top: 20px;
   position: relative;
+  z-index: 120;
 }
 
 .search-input {
@@ -266,6 +269,8 @@ input[type="number"] {
   border: 1px solid var(--border);
   background: #0b1220;
   font-size: 12px;
+  color: var(--text);
+  text-decoration: none;
 }
 
 .badge-v {
@@ -844,7 +849,7 @@ input[type="number"] {
   right: 0;
   max-height: 320px;
   overflow-y: auto;
-  z-index: 46;
+  z-index: 121;
   padding: 8px;
   background: rgba(15, 23, 42, 0.95) !important;
 }
@@ -930,6 +935,97 @@ input[type="number"] {
   padding: 20px;
   text-align: center;
   font-size: 14px;
+}
+
+.selected-funds {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.selected-funds .header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.selected-funds .count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.text-button {
+  background: transparent;
+  border: none;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.text-button:hover {
+  background: rgba(34, 211, 238, 0.12);
+}
+
+.selected-funds .tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.selected-funds .tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(34, 211, 238, 0.15);
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--primary);
+  max-width: 100%;
+}
+
+.selected-funds .tag span {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selected-funds .tag button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.selected-funds .tag button:hover {
+  background: rgba(34, 211, 238, 0.2);
+}
+
+.search-item .tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border);
+  color: var(--muted);
 }
 
 .selected-funds-bar {

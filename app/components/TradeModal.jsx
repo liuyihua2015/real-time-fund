@@ -64,7 +64,7 @@ function extractTradeFieldsFromOcr(text) {
   };
 }
 
-export default function TradeModal({ type, fund, unitPrice, onClose, onConfirm }) {
+export default function TradeModal({ type, fund, unitPrice, maxSellShare, onClose, onConfirm }) {
   const isBuy = type === 'buy';
   const [mode, setMode] = useState(isBuy ? 'amount' : 'share'); // 'amount' | 'share'
   const [share, setShare] = useState('');
@@ -72,6 +72,8 @@ export default function TradeModal({ type, fund, unitPrice, onClose, onConfirm }
   const [feeRate, setFeeRate] = useState('0');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [price, setPrice] = useState(String(unitPrice || ''));
+  const holdingShare =
+    typeof maxSellShare === 'number' && Number.isFinite(maxSellShare) ? maxSellShare : null;
   
   // OCR states
   const fileInputRef = useRef(null);
@@ -174,7 +176,33 @@ export default function TradeModal({ type, fund, unitPrice, onClose, onConfirm }
     }
   };
 
-  const isValid = !!preview;
+  const sellError = (() => {
+    if (isBuy) return '';
+    if (holdingShare == null) return '';
+    if (!(holdingShare > 0)) return '当前没有可卖出的持仓份额';
+    if (!preview) return '';
+    const eps = 1e-6;
+    if (mode === 'share') {
+      const s = parseFloat(share);
+      if (s > holdingShare + eps) return `卖出份额不能大于持仓份额（最多 ${holdingShare.toFixed(2)} 份）`;
+      return '';
+    }
+    if (mode === 'amount') {
+      if (preview.share > holdingShare + eps) {
+        const p = parseFloat(price);
+        const r = parseFloat(feeRate) / 100;
+        const maxNetAmount =
+          Number.isFinite(p) && Number.isFinite(r) && r < 1 ? holdingShare * p * (1 - r) : null;
+        return typeof maxNetAmount === 'number' && Number.isFinite(maxNetAmount)
+          ? `卖出金额过大（最多到手 ¥${maxNetAmount.toFixed(2)}）`
+          : '卖出金额过大（超过持仓可卖范围）';
+      }
+      return '';
+    }
+    return '';
+  })();
+
+  const isValid = !!preview && !sellError;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -392,11 +420,36 @@ export default function TradeModal({ type, fund, unitPrice, onClose, onConfirm }
               value={mode === 'amount' ? amount : share}
               onChange={(e) => mode === 'amount' ? setAmount(e.target.value) : setShare(e.target.value)}
               placeholder={mode === 'amount' ? "0.00" : "0.00"}
+              max={
+                !isBuy && holdingShare != null && holdingShare > 0
+                  ? mode === 'share'
+                    ? holdingShare
+                    : (() => {
+                        const p = parseFloat(price);
+                        const r = parseFloat(feeRate) / 100;
+                        if (!Number.isFinite(p) || !Number.isFinite(r) || r >= 1) return undefined;
+                        return holdingShare * p * (1 - r);
+                      })()
+                  : undefined
+              }
               style={{
                 width: '100%',
-                border: (!amount && mode === 'amount') || (!share && mode === 'share') ? '1px solid var(--danger)' : undefined
+                border:
+                  ((!amount && mode === 'amount') || (!share && mode === 'share') || sellError)
+                    ? '1px solid var(--danger)'
+                    : undefined
               }}
             />
+            {!isBuy && holdingShare != null ? (
+              <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
+                可卖份额：{holdingShare > 0 ? `${holdingShare.toFixed(2)} 份` : '0 份'}
+              </div>
+            ) : null}
+            {sellError ? (
+              <div className="error-text" style={{ marginTop: 8 }}>
+                {sellError}
+              </div>
+            ) : null}
           </div>
 
           <div className="row" style={{ gap: 10, marginBottom: 12 }}>

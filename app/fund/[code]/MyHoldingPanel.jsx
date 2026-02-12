@@ -5,7 +5,9 @@ import { AnimatePresence, motion } from 'framer-motion';
 import HoldingEditModal from '../../components/HoldingEditModal';
 import HoldingActionModal from '../../components/HoldingActionModal';
 import TradeModal from '../../components/TradeModal';
+import ConfirmModal from '../../components/ConfirmModal';
 import { loadHoldings, saveHoldings, normalizeHolding } from '../../lib/holdingsStorage';
+import { addTradeFromPayload } from '../../lib/tradeRecordsStorage';
 import styles from './fund-detail.module.css';
 
 function formatMoneyAbs(n) {
@@ -42,6 +44,7 @@ export default function MyHoldingPanel({ fund, currentUnit, navUnit }) {
   const [open, setOpen] = useState(false);
   const [actionOpen, setActionOpen] = useState(false);
   const [tradeModal, setTradeModal] = useState({ open: false, type: 'buy' });
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
 
   useEffect(() => {
     const next = loadHoldings();
@@ -140,6 +143,8 @@ export default function MyHoldingPanel({ fund, currentUnit, navUnit }) {
       const buyCost = typeof payload.totalCost === 'number' ? payload.totalCost : (payload.price * buyShare);
       
       if (!(buyShare > 0)) return;
+
+      addTradeFromPayload(code, payload, { fundName: fund?.name });
       
       const newShare = curShare + buyShare;
       const nextCostAmount = curCostAmount + buyCost;
@@ -156,21 +161,31 @@ export default function MyHoldingPanel({ fund, currentUnit, navUnit }) {
       saveHoldings(next);
       setHolding(nextHolding);
     } else {
-      const sellShare = Number(payload.share);
-      const redemptionAmount = typeof payload.redemptionAmount === 'number' 
-        ? payload.redemptionAmount 
-        : (sellShare * (payload.price || 0));
+      const sellShareRaw = Number(payload.share);
+      if (!(sellShareRaw > 0)) return;
+      if (!(curShare > 0)) return;
+      const eps = 1e-6;
+      if (sellShareRaw > curShare + eps) return;
+      const sellShare = Math.min(sellShareRaw, curShare);
 
-      if (!(sellShare > 0)) return;
-      
-      // Calculate proportion of cost basis sold
-      const sellRatio = curShare > 0 ? Math.min(1, sellShare / curShare) : 0;
+      const redemptionAmountRaw =
+        typeof payload.redemptionAmount === 'number'
+          ? payload.redemptionAmount
+          : sellShareRaw * (payload.price || 0);
+      const redemptionAmount =
+        sellShareRaw > 0 ? redemptionAmountRaw * (sellShare / sellShareRaw) : redemptionAmountRaw;
+
+      const tradePayload =
+        sellShare === sellShareRaw ? payload : { ...payload, share: sellShare, redemptionAmount };
+      addTradeFromPayload(code, tradePayload, { fundName: fund?.name });
+
+      const sellRatio = sellShare / curShare;
       const costOfSoldShares = curCostAmount * sellRatio;
-      
-      // Calculate realized profit
+
       const realizedProfit = redemptionAmount - costOfSoldShares;
-      
-      const nextProfitTotal = (typeof current.profitTotal === 'number' ? current.profitTotal : 0) + realizedProfit;
+
+      const nextProfitTotal =
+        (typeof current.profitTotal === 'number' ? current.profitTotal : 0) + realizedProfit;
       const nextCostAmount = curCostAmount - costOfSoldShares;
       const newShare = Math.max(0, curShare - sellShare);
       const newCostUnit = newShare > 0 ? nextCostAmount / newShare : 0;
@@ -285,6 +300,7 @@ export default function MyHoldingPanel({ fund, currentUnit, navUnit }) {
           <HoldingActionModal
             fund={fund}
             hasHolding={hasHolding}
+            canSell={typeof metrics.share === "number" && Number.isFinite(metrics.share) && metrics.share > 0}
             onClose={() => setActionOpen(false)}
             onAction={(type) => {
               setActionOpen(false);
@@ -293,7 +309,7 @@ export default function MyHoldingPanel({ fund, currentUnit, navUnit }) {
               } else if (type === 'edit') {
                 setOpen(true);
               } else if (type === 'clear') {
-                clearHolding();
+                setClearConfirmOpen(true);
               }
             }}
           />
@@ -306,11 +322,27 @@ export default function MyHoldingPanel({ fund, currentUnit, navUnit }) {
             type={tradeModal.type}
             fund={fund}
             unitPrice={currentUnit}
+            maxSellShare={typeof holding?.share === "number" && Number.isFinite(holding.share) ? holding.share : null}
             onClose={() => setTradeModal({ open: false, type: 'buy' })}
             onConfirm={(payload) => {
               applyTrade(payload);
               setTradeModal({ open: false, type: 'buy' });
             }}
+          />
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {clearConfirmOpen ? (
+          <ConfirmModal
+            title="清空持仓"
+            message={`确定要清空“${fund?.name || code}”的所有持仓记录吗？`}
+            onConfirm={() => {
+              setClearConfirmOpen(false);
+              clearHolding();
+            }}
+            onCancel={() => setClearConfirmOpen(false)}
+            confirmText="确认清空"
           />
         ) : null}
       </AnimatePresence>

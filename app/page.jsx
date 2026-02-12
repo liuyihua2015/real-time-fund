@@ -287,6 +287,15 @@ export default function HomePage() {
     } else if (type === "clear") {
       setClearConfirm({ fund });
     } else if (type === "buy" || type === "sell") {
+      if (type === "sell") {
+        const code = fund?.code;
+        const h = code ? holdings?.[code] : null;
+        const s = h ? Number(h.share) : 0;
+        if (!(Number.isFinite(s) && s > 0)) {
+          setError("当前没有持仓份额，无法减仓");
+          return;
+        }
+      }
       setTradeModal({ open: true, fund, type });
     }
     // ActionModal close is handled in the modal or wrapper
@@ -350,11 +359,30 @@ export default function HomePage() {
         startDate: current.startDate, // Keep existing start date
       });
     } else {
-      const newShare = Math.max(0, current.share - data.share);
+      const curShare =
+        typeof current.share === "number" && Number.isFinite(current.share)
+          ? current.share
+          : 0;
+      const sellShareRaw = Number(data.share);
+      if (!(sellShareRaw > 0) || !(curShare > 0)) {
+        setTradeModal({ open: false, fund: null, type: "buy" });
+        return;
+      }
+      const eps = 1e-6;
+      if (sellShareRaw > curShare + eps) {
+        setError("减仓份额不能大于持仓份额");
+        return;
+      }
+      const sellShare = Math.min(sellShareRaw, curShare);
+      const sellAmountRaw =
+        typeof data.redemptionAmount === "number"
+          ? data.redemptionAmount
+          : typeof data.totalAmount === "number"
+            ? data.totalAmount
+            : data.price * sellShareRaw;
       const sellAmount =
-        typeof data.totalAmount === "number"
-          ? data.totalAmount
-          : data.price * data.share;
+        sellShareRaw > 0 ? sellAmountRaw * (sellShare / sellShareRaw) : sellAmountRaw;
+      const newShare = Math.max(0, curShare - sellShare);
 
       // Calculate profit from this sale
       // Cost of sold shares
@@ -365,7 +393,7 @@ export default function HomePage() {
             ? current.cost
             : 0;
 
-      const costOfSold = currentCostUnit * data.share;
+      const costOfSold = currentCostUnit * sellShare;
       const profitRealized = sellAmount - costOfSold;
 
       const currentProfitTotal =
@@ -580,9 +608,12 @@ export default function HomePage() {
               className="input search-input"
               placeholder="输入代码或名称搜索添加..."
               value={searchTerm}
-              onChange={handleSearchInput}
+              onChange={(e) => {
+                handleSearchInput(e);
+                setShowDropdown(Boolean(e.target.value));
+              }}
               onFocus={() => {
-                if (searchTerm) setShowDropdown(true);
+                setShowDropdown(true);
                 setIsAddFundOpen(true);
               }}
               onKeyDown={(e) => {
@@ -1054,6 +1085,14 @@ export default function HomePage() {
                 (Number.isFinite(profitTotal) && profitTotal !== 0)
               );
             })()}
+            canSell={(() => {
+              const code = actionModal?.fund?.code;
+              if (!code) return false;
+              const h = holdings?.[code];
+              if (!h) return false;
+              const share = Number(h.share);
+              return Number.isFinite(share) && share > 0;
+            })()}
             onClose={() => setActionModal({ open: false, fund: null })}
             onAction={(type) => handleAction(type, actionModal.fund)}
           />
@@ -1076,6 +1115,12 @@ export default function HomePage() {
                     : Number(fund?.dwjz);
               })()
             }
+            maxSellShare={(() => {
+              const code = tradeModal?.fund?.code;
+              const h = code ? holdings?.[code] : null;
+              const s = h ? Number(h.share) : null;
+              return typeof s === "number" && Number.isFinite(s) ? s : null;
+            })()}
             onClose={() =>
               setTradeModal({ open: false, fund: null, type: "buy" })
             }

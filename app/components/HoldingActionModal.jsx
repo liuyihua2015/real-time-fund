@@ -31,7 +31,8 @@ function CloseIcon(props) {
   );
 }
 
-export default function HoldingActionModal({ fund, hasHolding, onClose, onAction }) {
+export default function HoldingActionModal({ fund, hasHolding, canSell, onClose, onAction }) {
+  const sellEnabled = typeof canSell === 'boolean' ? canSell : hasHolding;
   return (
     <motion.div
       className="modal-overlay"
@@ -88,11 +89,17 @@ export default function HoldingActionModal({ fund, hasHolding, onClose, onAction
           </button>
           <button
             className="button col-6"
-            onClick={() => onAction('sell')}
+            onClick={() => {
+              if (!sellEnabled) return;
+              onAction('sell');
+            }}
+            disabled={!sellEnabled}
             style={{
               background: 'rgba(248, 113, 113, 0.1)',
               border: '1px solid var(--danger)',
-              color: 'var(--danger)'
+              color: 'var(--danger)',
+              opacity: sellEnabled ? 1 : 0.45,
+              cursor: sellEnabled ? 'pointer' : 'not-allowed'
             }}
           >
             减仓
@@ -127,4 +134,3 @@ export default function HoldingActionModal({ fund, hasHolding, onClose, onAction
     </motion.div>
   );
 }
-
