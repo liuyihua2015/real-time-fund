@@ -52,8 +52,8 @@ const sortOptions = [
   { key: "name", label: "名称" },
   { key: "code", label: "代码" },
   { key: "total", label: "持仓总额" },
-  { key: "change", label: "当前涨幅" },
-  { key: "todayProfit", label: "当前收益" },
+  { key: "change", label: "今日涨幅" },
+  { key: "todayProfit", label: "今日收益" },
   { key: "yesterdayProfit", label: "昨日收益" },
   { key: "holdingProfit", label: "持有收益" },
 ];

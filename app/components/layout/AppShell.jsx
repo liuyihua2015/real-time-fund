@@ -139,6 +139,26 @@ export default function AppShell({ children }) {
   const router = useRouter();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [version, setVersion] = useState("v1.0.0");
+
+  useEffect(() => {
+    const fetchVersion = async () => {
+      try {
+        const res = await fetch(
+          "https://api.github.com/repos/liuyihua2015/real-time-fund/tags",
+        );
+        if (res.ok) {
+          const tags = await res.json();
+          if (tags && tags.length > 0) {
+            setVersion(tags[0].name);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch version:", error);
+      }
+    };
+    fetchVersion();
+  }, []);
 
   useEffect(() => {
     try {
@@ -237,24 +257,29 @@ export default function AppShell({ children }) {
         id="app-sidebar"
         className={`app-sidebar ui-glass ${mobileNavOpen ? "open" : ""}`}
       >
-        <nav className="app-nav">
-          {navItems.map((it) => {
-            const active =
-              it.href === "/"
-                ? pathname === "/"
-                : pathname?.startsWith(it.href);
-            return (
-              <Link
-                key={it.href}
-                href={it.href}
-                className={`app-nav-item ${active ? "active" : ""}`}
-                onClick={() => setMobileNavOpen(false)}
-              >
-                {it.label}
-              </Link>
-            );
-          })}
-        </nav>
+        <div className="app-sidebar-inner">
+          <nav className="app-nav">
+            {navItems.map((it) => {
+              const active =
+                it.href === "/"
+                  ? pathname === "/"
+                  : pathname?.startsWith(it.href);
+              return (
+                <Link
+                  key={it.href}
+                  href={it.href}
+                  className={`app-nav-item ${active ? "active" : ""}`}
+                  onClick={() => setMobileNavOpen(false)}
+                >
+                  {it.label}
+                </Link>
+              );
+            })}
+          </nav>
+          <div className="app-sidebar-footer">
+            <span className="app-version">{version}</span>
+          </div>
+        </div>
       </aside>
 
       {mobileNavOpen && (

@@ -106,7 +106,7 @@ export default function FundList({
                     className="table-sort"
                     onClick={() => toggleListSort("change")}
                   >
-                    当前涨幅{" "}
+                    今日涨幅{" "}
                     <SortArrowsIcon
                       width="14"
                       height="14"
@@ -121,7 +121,7 @@ export default function FundList({
                     className="table-sort"
                     onClick={() => toggleListSort("todayProfit")}
                   >
-                    当前收益{" "}
+                    今日收益{" "}
                     <SortArrowsIcon
                       width="14"
                       height="14"
