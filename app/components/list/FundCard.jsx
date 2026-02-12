@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { ExitIcon, StarIcon, SettingsIcon, TrashIcon } from "../Icons";
 import { isYmdAfter } from "../../lib/dateUtils";
@@ -168,7 +169,11 @@ const FundCard = React.forwardRef(function FundCard(props, ref) {
                   />
                 </button>
               )}
-              <div className="title-text">
+              <Link
+                href={`/fund/${f.code}`}
+                className="title-text"
+                style={{ textDecoration: "none" }}
+              >
                 <span className="name-text">
                   <span
                     className="mobile-index"
@@ -184,7 +189,7 @@ const FundCard = React.forwardRef(function FundCard(props, ref) {
                   {f.name}
                 </span>
                 <span className="muted code-text">#{f.code}</span>
-              </div>
+              </Link>
             </div>
 
             <div className="table-cell text-center total-cell">

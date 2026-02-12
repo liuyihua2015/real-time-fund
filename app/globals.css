@@ -491,7 +491,7 @@ body {
 .search-bar {
   margin-top: 20px;
   position: relative;
-  z-index: 120;
+  z-index: 1000;
 }
 
 .search-input {
@@ -1214,9 +1214,11 @@ html[data-theme="light"] .theme-icon--moon {
   right: 0;
   max-height: 320px;
   overflow-y: auto;
-  z-index: 121;
+  z-index: 1001;
   padding: 8px;
-  background: var(--glass-bg) !important;
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-float);
 }
 
 .search-results {
@@ -1338,6 +1340,21 @@ html[data-theme="light"] .theme-icon--moon {
 
 .text-button:hover {
   background: rgba(34, 211, 238, 0.12);
+}
+
+.app-version-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 10px;
+  margin-right: 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .selected-funds .tags {

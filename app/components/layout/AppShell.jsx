@@ -239,6 +239,9 @@ export default function AppShell({ children }) {
           {title && <div className="app-title">{title}</div>}
         </div>
         <div className="app-topnav-right">
+          <span className="app-version-badge" title="当前版本">
+            {version}
+          </span>
           <a
             className="ui-icon-button"
             href={GITHUB_REPO_URL}
