@@ -481,23 +481,8 @@ export default function FundCardDetailClient({ code }) {
 
   if (loading) {
     return (
-      <div className="container content">
-        <div className="navbar glass">
-          <div className="brand">
-            <button
-              type="button"
-              className="icon-button"
-              onClick={() => router.push("/")}
-              aria-label="返回首页"
-              title="返回首页"
-            >
-              <ArrowLeftIcon width="18" height="18" />
-            </button>
-            <span>估值罗盘</span>
-          </div>
-          <div className="actions" />
-        </div>
-        <div className="glass card" style={{ padding: 18, marginTop: 100 }}>
+      <div className="ui-page">
+        <div className="ui-glass ui-panel compact" style={{ cursor: "default" }}>
           <div className="muted">加载中…</div>
         </div>
       </div>
@@ -506,40 +491,17 @@ export default function FundCardDetailClient({ code }) {
 
   if (error || !detail) {
     return (
-      <div className="container content">
-        <div className="navbar glass">
-          <div className="brand">
-            <button
-              type="button"
-              className="icon-button"
-              onClick={() => router.push("/")}
-              aria-label="返回首页"
-              title="返回首页"
-            >
-              <ArrowLeftIcon width="18" height="18" />
-            </button>
-            <span>估值罗盘</span>
-          </div>
-          <div className="actions" />
-        </div>
-        <div className="glass card" style={{ padding: 18, marginTop: 100 }}>
+      <div className="ui-page">
+        <div className="ui-glass ui-panel" style={{ cursor: "default" }}>
           <div style={{ fontWeight: 700, marginBottom: 8 }}>加载失败</div>
           <div className="muted" style={{ marginBottom: 14 }}>
             请稍后再试
           </div>
-          <div className="row" style={{ gap: 10 }}>
-            <button
-              className="button"
-              type="button"
-              onClick={() => router.refresh()}
-            >
+          <div className="row" style={{ gap: 10, justifyContent: "flex-start" }}>
+            <button className="button" type="button" onClick={() => router.refresh()}>
               重试
             </button>
-            <Link
-              className="button secondary"
-              href="/"
-              style={{ textDecoration: "none" }}
-            >
+            <Link className="button secondary" href="/" style={{ textDecoration: "none" }}>
               返回列表
             </Link>
           </div>
@@ -549,23 +511,8 @@ export default function FundCardDetailClient({ code }) {
   }
 
   return (
-    <div className="container content">
-      <div className="navbar glass">
-        <div className="brand">
-          <button
-            type="button"
-            className="icon-button"
-            onClick={() => router.push("/")}
-            aria-label="返回首页"
-            title="返回首页"
-          >
-            <ArrowLeftIcon width="18" height="18" />
-          </button>
-          <span>估值罗盘</span>
-        </div>
-        <div className="actions" />
-      </div>
-      <div className="glass card" style={{ cursor: "default", marginTop: 100 }}>
+    <div className="ui-page">
+      <div className="ui-glass ui-panel" style={{ cursor: "default" }}>
         <div className="row" style={{ marginBottom: 20 }}>
           <div className="title">
             <button

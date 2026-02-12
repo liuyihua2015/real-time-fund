@@ -1,7 +1,7 @@
 # 估值罗盘 (ValuCompass)
 
 一个基于 Next.js 开发的纯前端“实时基金估值 + 持仓管理 + 重仓股追踪”工具。采用玻璃拟态设计（Glassmorphism），支持移动端适配，且无需后端服务器即可运行。
-预览地址：[https://hzm0321.github.io/real-time-fund/](https://hzm0321.github.io/real-time-fund/)
+预览地址：[https://liuyihua2015.github.io/real-time-fund/](https://liuyihua2015.github.io/real-time-fund/)
 
 ## ✨ 特性
 
@@ -28,12 +28,14 @@
 ### 本地开发
 
 1. 克隆仓库：
+
    ```bash
-   git clone https://github.com/hzm0321/real-time-fund.git
+   git clone https://github.com/liuyihua2015/real-time-fund.git
    cd real-time-fund
    ```
 
 2. 安装依赖：
+
    ```bash
    npm install
    ```
@@ -58,9 +60,11 @@
 本项目已配置 GitHub Actions。每次推送到 `main` 分支时，会自动执行构建并部署到 GitHub Pages。
 
 若要手动构建：
+
 ```bash
 npm run build
 ```
+
 静态文件将生成在 `out` 目录下。
 
 ## 💬 意见反馈（Web3Forms）
@@ -93,4 +97,5 @@ npm run build
 完整协议文本见仓库根目录 [LICENSE](./LICENSE) 文件，或 [GNU AGPL v3 官方说明](https://www.gnu.org/licenses/agpl-3.0.html)。
 
 ---
-Made by [hzm](https://github.com/hzm0321)
+
+Made by [hzm](https://github.com/liuyihua2015)

@@ -1,13 +1,13 @@
-'use client';
-import { useLayoutEffect, useState } from 'react';
-import Script from 'next/script';
+"use client";
+import { useLayoutEffect, useState } from "react";
+import Script from "next/script";
 
 export default function AnalyticsGate({ GA_ID }) {
   const [enabled, setEnabled] = useState(false);
-    useLayoutEffect(() => {
+  useLayoutEffect(() => {
     try {
-      const href = window.location.href || '';
-      setEnabled(href.includes('hzm0321'));
+      const href = window.location.href || "";
+      setEnabled(href.includes("liuyihua2015"));
     } catch {}
   }, []);
 
@@ -15,7 +15,10 @@ export default function AnalyticsGate({ GA_ID }) {
 
   return (
     <>
-      <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
+      <Script
+        src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
+        strategy="afterInteractive"
+      />
       <Script id="google-analytics" strategy="afterInteractive">
         {`
           window.dataLayer = window.dataLayer || [];

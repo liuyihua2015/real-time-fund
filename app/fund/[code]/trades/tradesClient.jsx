@@ -289,7 +289,7 @@ export default function TradesClient({ code }) {
   };
 
   return (
-    <div className="container content">
+    <div className="ui-page">
       <AnimatePresence>
         {deleteConfirm ? (
           <ConfirmModal
@@ -308,68 +308,64 @@ export default function TradesClient({ code }) {
         ) : null}
       </AnimatePresence>
 
-      <div className="navbar glass">
-        <div className="brand">
-          <button
-            type="button"
-            className="icon-button"
-            onClick={() => router.push(`/fund/${code}`)}
-            aria-label="返回基金详情"
-            title="返回基金详情"
-          >
-            <ArrowLeftIcon width="18" height="18" />
-          </button>
-          <span>交易记录</span>
-        </div>
-        <div className="actions">
-          <button
-            type="button"
-            className="icon-button"
-            title="导出交易记录"
-            aria-label="导出交易记录"
-            onClick={exportTrades}
-          >
-            <DownloadIcon width="18" height="18" />
-          </button>
-          <button
-            type="button"
-            className="icon-button"
-            title="导入交易记录"
-            aria-label="导入交易记录"
-            onClick={() => importFileRef.current?.click?.()}
-          >
-            <UploadIcon width="18" height="18" />
-          </button>
-          <input
-            ref={importFileRef}
-            type="file"
-            accept="application/json"
-            style={{ display: 'none' }}
-            onChange={handleImportFileChange}
-          />
-        </div>
-      </div>
-
-      <div className="glass card" style={{ cursor: 'default', marginTop: 100 }}>
+      <div className="ui-glass ui-panel" style={{ cursor: 'default' }}>
         <div className="row" style={{ marginBottom: 14, alignItems: 'flex-start' }}>
-          <div className="title" style={{ margin: 0 }}>
-            <div className="title-text">
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                {detail?.name || sorted?.[0]?.fundName || code}
-              </span>
-              <span className="muted">#{code}</span>
+          <div className="row" style={{ justifyContent: 'flex-start', gap: 12 }}>
+            <button
+              type="button"
+              className="ui-icon-button"
+              onClick={() => router.push(`/fund/${code}`)}
+              aria-label="返回基金详情"
+              title="返回基金详情"
+            >
+              <ArrowLeftIcon width="18" height="18" />
+            </button>
+            <div className="title" style={{ margin: 0 }}>
+              <div className="title-text">
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {detail?.name || sorted?.[0]?.fundName || code}
+                </span>
+                <span className="muted">#{code}</span>
+              </div>
             </div>
           </div>
 
-          <div className="badge-v">
-            <span>记录数</span>
-            <strong>
-              {summary.total}
-              <span className="muted" style={{ fontWeight: 500 }}>
-                {' '}
-                (加{summary.buys} / 减{summary.sells})
-              </span>
-            </strong>
+          <div className="actions">
+            <div className="badge-v">
+              <span>记录数</span>
+              <strong>
+                {summary.total}
+                <span className="muted" style={{ fontWeight: 500 }}>
+                  {' '}
+                  (加{summary.buys} / 减{summary.sells})
+                </span>
+              </strong>
+            </div>
+            <button
+              type="button"
+              className="ui-icon-button"
+              title="导出交易记录"
+              aria-label="导出交易记录"
+              onClick={exportTrades}
+            >
+              <DownloadIcon width="18" height="18" />
+            </button>
+            <button
+              type="button"
+              className="ui-icon-button"
+              title="导入交易记录"
+              aria-label="导入交易记录"
+              onClick={() => importFileRef.current?.click?.()}
+            >
+              <UploadIcon width="18" height="18" />
+            </button>
+            <input
+              ref={importFileRef}
+              type="file"
+              accept="application/json"
+              style={{ display: 'none' }}
+              onChange={handleImportFileChange}
+            />
           </div>
         </div>
 

@@ -50,21 +50,22 @@ function SettingsTinyIcon(props) {
   );
 }
 
-export default function FundCard({
-  fund: f,
-  holding,
-  idx,
-  viewMode,
-  currentTab,
-  favorites,
-  isTradingDay,
-  todayStr,
-  getHoldingProfit,
-  toggleFavorite,
-  removeFundFromCurrentGroup,
-  openFundDetail,
-  onAction,
-}) {
+const FundCard = React.forwardRef(function FundCard(props, ref) {
+  const {
+    fund: f,
+    holding,
+    idx,
+    viewMode,
+    currentTab,
+    favorites,
+    isTradingDay,
+    todayStr,
+    getHoldingProfit,
+    toggleFavorite,
+    removeFundFromCurrentGroup,
+    openFundDetail,
+    onAction,
+  } = props;
   const profit = getHoldingProfit(f, holding);
 
   // Data mapping for card view
@@ -101,6 +102,7 @@ export default function FundCard({
 
   return (
     <motion.div
+      ref={ref}
       layout="position"
       className={viewMode === "card" ? "col-6" : "table-row-wrapper"}
       initial={{ opacity: 0, scale: 0.95 }}
@@ -697,4 +699,6 @@ export default function FundCard({
       </div>
     </motion.div>
   );
-}
+});
+
+export default FundCard;

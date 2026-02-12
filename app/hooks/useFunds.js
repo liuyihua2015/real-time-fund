@@ -7,6 +7,7 @@ export function useFunds() {
   const [refreshing, setRefreshing] = useState(false);
   const refreshingRef = useRef(false);
   const [isTradingDay, setIsTradingDay] = useState(true);
+  const [lastRefreshTime, setLastRefreshTime] = useState(null);
 
   // 检查交易日状态
   const checkTradingDay = useCallback(() => {
@@ -140,6 +141,7 @@ export function useFunds() {
           return deduped;
         });
       }
+      setLastRefreshTime(new Date());
     } catch (e) {
       console.error(e);
     } finally {
@@ -149,47 +151,50 @@ export function useFunds() {
   }, []);
 
   const addFund = useCallback(async (selectedCodes, funds, nameMap = {}) => {
-      const newFunds = [];
-      const failures = [];
-      for (const c of selectedCodes) {
-        if (funds.some((f) => f.code === c)) continue;
-        try {
-          const data = await fetchFundData(c);
-          newFunds.push(data);
-        } catch (err) {
-          failures.push({ code: c, name: nameMap[c] });
-        }
+    const newFunds = [];
+    const failures = [];
+    for (const c of selectedCodes) {
+      if (funds.some((f) => f.code === c)) continue;
+      try {
+        const data = await fetchFundData(c);
+        newFunds.push(data);
+      } catch (err) {
+        failures.push({ code: c, name: nameMap[c] });
       }
-      return { newFunds, failures };
+    }
+    return { newFunds, failures };
   }, []);
 
-  const removeFund = useCallback((removeCode, groups, setGroups, setCollapsedCodes) => {
+  const removeFund = useCallback(
+    (removeCode, groups, setGroups, setCollapsedCodes) => {
       setFunds((prev) => {
-          const next = prev.filter((f) => f.code !== removeCode);
-          localStorage.setItem("funds", JSON.stringify(next));
-          return next;
+        const next = prev.filter((f) => f.code !== removeCode);
+        localStorage.setItem("funds", JSON.stringify(next));
+        return next;
       });
 
-    // 同步删除分组中的失效代码
-    if (groups && setGroups) {
+      // 同步删除分组中的失效代码
+      if (groups && setGroups) {
         const nextGroups = groups.map((g) => ({
-        ...g,
-        codes: g.codes.filter((c) => c !== removeCode),
+          ...g,
+          codes: g.codes.filter((c) => c !== removeCode),
         }));
         setGroups(nextGroups);
         localStorage.setItem("groups", JSON.stringify(nextGroups));
-    }
+      }
 
-    // 同步删除展开收起状态
-    if (setCollapsedCodes) {
+      // 同步删除展开收起状态
+      if (setCollapsedCodes) {
         setCollapsedCodes((prev) => {
-            if (!prev.has(removeCode)) return prev;
-            const nextSet = new Set(prev);
-            nextSet.delete(removeCode);
-            return nextSet;
+          if (!prev.has(removeCode)) return prev;
+          const nextSet = new Set(prev);
+          nextSet.delete(removeCode);
+          return nextSet;
         });
-    }
-  }, []);
+      }
+    },
+    [],
+  );
 
   // Load initial funds
   useEffect(() => {
@@ -197,11 +202,11 @@ export function useFunds() {
       const saved = JSON.parse(localStorage.getItem("funds") || "[]");
       if (Array.isArray(saved) && saved.length) {
         // Sanitize data: flatten nested objects if present
-        const sanitized = saved.map(f => {
+        const sanitized = saved.map((f) => {
           if (!f) return f;
           const nav = f.nav || {}; // If nav exists (from bad data), use it
           // Check if dwjz is an object (bad data indicator)
-          if (typeof f.dwjz === 'object' && f.dwjz !== null) {
+          if (typeof f.dwjz === "object" && f.dwjz !== null) {
             // It's likely the old bad structure or f.dwjz is actually the nav object
             // But based on previous analysis, we likely had:
             // dwjz: data.nav (which is { navUnit, ... })
@@ -217,31 +222,37 @@ export function useFunds() {
             };
           }
           // Also check if 'nav' property exists and we want to flatten it?
-          // The previous bad code did: dwjz: data.nav. 
+          // The previous bad code did: dwjz: data.nav.
           // So f.dwjz IS the nav object.
           // Let's strictly check for the specific bad pattern: dwjz having navUnit
           let newF = { ...f };
-          if (newF.dwjz && typeof newF.dwjz === 'object') newF.dwjz = newF.dwjz.navUnit;
-          if (newF.gsz && typeof newF.gsz === 'object') newF.gsz = newF.gsz.estimateUnit;
-          if (newF.gztime && typeof newF.gztime === 'object') newF.gztime = newF.gztime.estimateTime;
-          if (newF.jzrq && typeof newF.jzrq === 'object') newF.jzrq = newF.jzrq.navDate;
-          if (newF.gszzl && typeof newF.gszzl === 'object') newF.gszzl = newF.gszzl.estimateChangePct;
-          
+          if (newF.dwjz && typeof newF.dwjz === "object")
+            newF.dwjz = newF.dwjz.navUnit;
+          if (newF.gsz && typeof newF.gsz === "object")
+            newF.gsz = newF.gsz.estimateUnit;
+          if (newF.gztime && typeof newF.gztime === "object")
+            newF.gztime = newF.gztime.estimateTime;
+          if (newF.jzrq && typeof newF.jzrq === "object")
+            newF.jzrq = newF.jzrq.navDate;
+          if (newF.gszzl && typeof newF.gszzl === "object")
+            newF.gszzl = newF.gszzl.estimateChangePct;
+
           return newF;
         });
 
         const deduped = dedupeByCode(sanitized);
         setFunds(deduped);
-        
-        // Initial refresh logic moved to component to avoid double fetch if needed, 
+
+        // Initial refresh logic moved to component to avoid double fetch if needed,
         // or keep it here if we want auto-refresh on mount.
         // For now, let's expose refreshAll and let component call it if needed.
         const codes = Array.from(new Set(deduped.map((f) => f.code)));
-        const shouldSkip = sessionStorage.getItem("skip_refresh_on_mount") === "true";
+        const shouldSkip =
+          sessionStorage.getItem("skip_refresh_on_mount") === "true";
         if (shouldSkip) {
-            sessionStorage.removeItem("skip_refresh_on_mount");
+          sessionStorage.removeItem("skip_refresh_on_mount");
         } else if (codes.length) {
-            refreshAll(codes);
+          refreshAll(codes);
         }
       }
     } catch (e) {
@@ -258,9 +269,10 @@ export function useFunds() {
     setError,
     refreshing,
     isTradingDay,
+    lastRefreshTime,
     refreshAll,
     fetchFundData,
     addFund,
-    removeFund
+    removeFund,
   };
 }

@@ -58,6 +58,25 @@ const sortOptions = [
   { key: "holdingProfit", label: "持有收益" },
 ];
 
+function CompassIcon(props) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+    >
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+      <path
+        d="M14.5 9.5l-2 5-5 2 2-5 5-2z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export default function HomePage() {
   const router = useRouter();
 
@@ -81,6 +100,7 @@ export default function HomePage() {
     setError,
     refreshing,
     isTradingDay,
+    lastRefreshTime,
     refreshAll,
     fetchFundData,
     addFund: addFundLogic,
@@ -175,7 +195,7 @@ export default function HomePage() {
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef(null);
   const [isAddFundOpen, setIsAddFundOpen] = useState(false);
-  
+
   // Sort Dropdown State
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const sortDropdownRef = useRef(null);
@@ -200,7 +220,10 @@ export default function HomePage() {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowDropdown(false);
       }
-      if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target)) {
+      if (
+        sortDropdownRef.current &&
+        !sortDropdownRef.current.contains(event.target)
+      ) {
         setShowSortDropdown(false);
       }
     };
@@ -389,7 +412,9 @@ export default function HomePage() {
             ? data.totalAmount
             : data.price * sellShareRaw;
       const sellAmount =
-        sellShareRaw > 0 ? sellAmountRaw * (sellShare / sellShareRaw) : sellAmountRaw;
+        sellShareRaw > 0
+          ? sellAmountRaw * (sellShare / sellShareRaw)
+          : sellAmountRaw;
       const newShare = Math.max(0, curShare - sellShare);
 
       // Calculate profit from this sale
@@ -566,23 +591,42 @@ export default function HomePage() {
   };
 
   return (
-    <div className="container">
-      <div className="header glass">
+    <div className="ui-page">
+      <div className="ui-glass ui-panel">
         <div className="row" style={{ justifyContent: "space-between" }}>
-          <h1 className="title">
-            <span className="logo">🧭</span>
-            <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <span>估值罗盘</span>
-              <span
-                className="muted"
-                style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.2 }}
-              >
-                实时估值 · 一眼看仓位
-              </span>
+          <h1 className="title hero-title">
+            <span className="hero-title-row">
+              <CompassIcon
+                width="26"
+                height="26"
+                style={{ color: "var(--primary)" }}
+              />
+              <span className="hero-title-text">估值罗盘</span>
             </span>
+            <span className="muted hero-subtitle">实时估值 · 一眼看仓位</span>
           </h1>
           <div className="row">
             <Announcement />
+            <div
+              className="refresh-info"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-end",
+                marginRight: "8px",
+                fontSize: "11px",
+                color: "var(--muted)",
+                lineHeight: "1.2",
+              }}
+            >
+              <span>{refreshMs / 1000}s 自动刷新</span>
+              {lastRefreshTime && (
+                <span>
+                  上次:{" "}
+                  {lastRefreshTime.toLocaleTimeString([], { hour12: false })}
+                </span>
+              )}
+            </div>
             <button
               className={`icon-button ${refreshing ? "spin" : ""}`}
               onClick={handleRefresh}
@@ -1116,18 +1160,16 @@ export default function HomePage() {
           <TradeModal
             type={tradeModal.type}
             fund={tradeModal.fund}
-            unitPrice={
-              (() => {
-                const fund = tradeModal.fund;
-                const useValuation = isYmdAfter(todayStr, fund?.jzrq);
-                if (!useValuation) return Number(fund?.dwjz);
-                return fund?.estPricedCoverage > 0.05
-                  ? fund?.estGsz
-                  : typeof fund?.gsz === "number"
-                    ? fund?.gsz
-                    : Number(fund?.dwjz);
-              })()
-            }
+            unitPrice={(() => {
+              const fund = tradeModal.fund;
+              const useValuation = isYmdAfter(todayStr, fund?.jzrq);
+              if (!useValuation) return Number(fund?.dwjz);
+              return fund?.estPricedCoverage > 0.05
+                ? fund?.estGsz
+                : typeof fund?.gsz === "number"
+                  ? fund?.gsz
+                  : Number(fund?.dwjz);
+            })()}
             maxSellShare={(() => {
               const code = tradeModal?.fund?.code;
               const h = code ? holdings?.[code] : null;
