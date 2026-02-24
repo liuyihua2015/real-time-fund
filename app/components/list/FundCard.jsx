@@ -170,7 +170,7 @@ const FundCard = React.forwardRef(function FundCard(props, ref) {
                 </button>
               )}
               <Link
-                href={`/fund/${f.code}`}
+                href={`/fund?code=${f.code}`}
                 className="title-text"
                 style={{ textDecoration: "none" }}
               >

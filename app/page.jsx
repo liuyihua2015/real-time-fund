@@ -307,7 +307,7 @@ export default function HomePage() {
     if (target.closest('button, input, textarea, select, [role="button"]'))
       return;
     sessionStorage.setItem("skip_refresh_on_mount", "true");
-    router.push(`/fund/${code}`);
+    router.push(`/fund?code=${code}`);
   };
 
   const handleAction = (type, fund) => {

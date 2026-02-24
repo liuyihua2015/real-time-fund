@@ -4,18 +4,18 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
-import HoldingEditModal from "../../components/HoldingEditModal";
-import HoldingActionModal from "../../components/HoldingActionModal";
-import TradeModal from "../../components/TradeModal";
-import ConfirmModal from "../../components/ConfirmModal";
-import { getFundDetail } from "../../lib/fundClient";
+import HoldingEditModal from "../components/HoldingEditModal";
+import HoldingActionModal from "../components/HoldingActionModal";
+import TradeModal from "../components/TradeModal";
+import ConfirmModal from "../components/ConfirmModal";
+import { getFundDetail } from "../lib/fundClient";
 import {
   loadHoldings,
   saveHoldings,
   normalizeHolding,
-} from "../../lib/holdingsStorage";
-import { addTradeFromPayload } from "../../lib/tradeRecordsStorage";
-import { calcFundCurrentNav, calcHoldingProfit } from "../../lib/holdingProfit";
+} from "../lib/holdingsStorage";
+import { addTradeFromPayload } from "../lib/tradeRecordsStorage";
+import { calcFundCurrentNav, calcHoldingProfit } from "../lib/holdingProfit";
 
 function pickUpDownClass(n) {
   if (!Number.isFinite(n) || n === 0) return "";
@@ -197,6 +197,9 @@ export default function FundCardDetailClient({ code }) {
         if (aborted) return;
         setDetail(json);
         setLoading(false);
+        if (json?.name) {
+          document.title = `${json.name} (${code}) - 估值罗盘`;
+        }
       })
       .catch((err) => {
         if (aborted) return;
@@ -568,7 +571,7 @@ export default function FundCardDetailClient({ code }) {
             </div>
             <Link
               className="badge"
-              href={`/fund/${code}/trades`}
+              href={`/fund/trades?code=${code}`}
               style={{ textDecoration: "none" }}
             >
               交易记录

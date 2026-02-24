@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import HoldingEditModal from '../../components/HoldingEditModal';
-import HoldingActionModal from '../../components/HoldingActionModal';
-import TradeModal from '../../components/TradeModal';
-import ConfirmModal from '../../components/ConfirmModal';
-import { loadHoldings, saveHoldings, normalizeHolding } from '../../lib/holdingsStorage';
-import { addTradeFromPayload } from '../../lib/tradeRecordsStorage';
+import HoldingEditModal from '../components/HoldingEditModal';
+import HoldingActionModal from '../components/HoldingActionModal';
+import TradeModal from '../components/TradeModal';
+import ConfirmModal from '../components/ConfirmModal';
+import { loadHoldings, saveHoldings, normalizeHolding } from '../lib/holdingsStorage';
+import { addTradeFromPayload } from '../lib/tradeRecordsStorage';
 import styles from './fund-detail.module.css';
 
 function formatMoneyAbs(n) {

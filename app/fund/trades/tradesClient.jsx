@@ -4,15 +4,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
-import ConfirmModal from "../../../components/ConfirmModal";
-import { getFundDetail } from "../../../lib/fundClient";
+import ConfirmModal from "../../components/ConfirmModal";
+import { getFundDetail } from "../../lib/fundClient";
 import {
   loadTradeRecords,
   loadTradesByCode,
   normalizeTradeRecord,
   removeTradeRecordById,
   saveTradeRecords,
-} from "../../../lib/tradeRecordsStorage";
+} from "../../lib/tradeRecordsStorage";
 
 function formatMoney(n) {
   if (!Number.isFinite(n)) return "—";
@@ -341,7 +341,7 @@ export default function TradesClient({ code }) {
             <button
               type="button"
               className="ui-icon-button"
-              onClick={() => router.push(`/fund/${code}`)}
+              onClick={() => router.push(`/fund?code=${code}`)}
               aria-label="返回基金详情"
               title="返回基金详情"
             >
@@ -515,7 +515,7 @@ export default function TradesClient({ code }) {
             </div>
             <Link
               className="button"
-              href={`/fund/${code}`}
+              href={`/fund?code=${code}`}
               style={{ display: "inline-flex", textDecoration: "none" }}
             >
               回到基金详情
